@@ -196,7 +196,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
         {
             final IngestionTestBase.SubscribeDataResponseObserver responseObserver =
                     (IngestionTestBase.SubscribeDataResponseObserver) subscribeDataCall.responseObserver();
-            
+
             // wait for completion of API method response stream and confirm not in error state
             responseObserver.awaitResponseLatch();
             assertFalse(responseObserver.isError());

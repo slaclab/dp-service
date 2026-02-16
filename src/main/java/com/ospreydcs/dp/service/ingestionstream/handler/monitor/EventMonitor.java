@@ -23,6 +23,8 @@ import org.apache.logging.log4j.Logger;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public class EventMonitor {
 
@@ -99,14 +101,6 @@ public class EventMonitor {
     private long getCleanupIntervalMillis() {
         return configMgr().getConfigLong(CFG_KEY_EVENT_CLEANUP_INTERVAL_MILLIS, DEFAULT_EVENT_CLEANUP_INTERVAL_MILLIS);
     }
-
-    // local type defs
-    private static record TriggerResult(
-            boolean isTriggered,
-            boolean isError,
-            String errorMsg
-    ) {}
-
 
     public EventMonitor(
             SubscribeDataEventRequest.NewSubscription requestSubscription,
@@ -272,170 +266,6 @@ public class EventMonitor {
         handleError(exceptionalResult.getMessage());
     }
 
-    private static <T extends Comparable<T>> TriggerResult checkTrigger(
-            T typedDataValue,
-            T typedTriggerValue,
-            PvConditionTrigger.PvCondition triggerCondition
-    ) {
-        final int compareResult = typedDataValue.compareTo(typedTriggerValue);
-
-        switch (triggerCondition) {
-            case PV_CONDITION_UNSPECIFIED -> {
-                final String errorMsg = "PvConditionTrigger.condition must be specified";
-                return new TriggerResult(false, true, errorMsg);
-            }
-            case PV_CONDITION_EQUAL_TO -> {
-                return new TriggerResult(compareResult == 0, false, "");
-            }
-            case PV_CONDITION_GREATER -> {
-                return new TriggerResult(compareResult > 0, false, "");
-            }
-            case PV_CONDITION_GREATER_EQ -> {
-                return new TriggerResult(compareResult >= 0, false, "");
-            }
-            case PV_CONDITION_LESS -> {
-                return new TriggerResult(compareResult < 0, false, "");
-            }
-            case PV_CONDITION_LESS_EQ -> {
-                return new TriggerResult(compareResult <= 0, false, "");
-            }
-            case UNRECOGNIZED -> {
-                final String errorMsg = "PvConditionTrigger.condition unrecognized enum value";
-                return new TriggerResult(false, true, errorMsg);
-            }
-        }
-
-        final String errorMsg = "PvConditionTrigger.condition unhandled condition: " + triggerCondition;
-        return new TriggerResult(false, true, errorMsg);
-    }
-
-    private void handleTriggerPVData(
-            PvConditionTrigger trigger,
-            DataColumn dataColumn,
-            DataTimestamps dataTimestamps
-    ) {
-        final String columnPvName = dataColumn.getName();
-
-        // check if each column data value triggers the event
-        int columnValueIndex = 0;
-        for (DataValue dataValue : dataColumn.getDataValuesList()) {
-
-            final PvConditionTrigger.PvCondition triggerCondition = trigger.getCondition();
-            final DataValue triggerValue = trigger.getValue();
-
-            // check for type mismatch between column data value and trigger value
-            if (dataValue.getValueCase() != triggerValue.getValueCase()) {
-                final String errorMsg = "PvConditionTrigger type mismatch PV name: " + columnPvName
-                        + " PV data type: " + dataValue.getValueCase().name()
-                        + " trigger value data type: " + triggerValue.getValueCase().name();
-                handleError(errorMsg);
-                return;
-            }
-
-            // check if event condition is triggered by data value
-            boolean isTriggered = false;
-            boolean isError = false;
-            String resultErrorMsg = "";
-            TriggerResult triggerResult = null;
-            switch (dataValue.getValueCase()) {
-                
-                case STRINGVALUE -> {
-                    final String typedDataValue = dataValue.getStringValue();
-                    final String typedTriggerValue = triggerValue.getStringValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-                
-                case BOOLEANVALUE -> {
-                    final Boolean typedDataValue = dataValue.getBooleanValue();
-                    final Boolean typedTriggerValue = triggerValue.getBooleanValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-                
-                case UINTVALUE -> {
-                    final int typedDataValue = dataValue.getUintValue();
-                    final int typedTriggerValue = triggerValue.getUintValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-                
-                case ULONGVALUE -> {
-                    final long typedDataValue = dataValue.getUlongValue();
-                    final long typedTriggerValue = triggerValue.getUlongValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-                
-                case INTVALUE -> {
-                    final int typedDataValue = dataValue.getIntValue();
-                    final int typedTriggerValue = triggerValue.getIntValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-
-                case LONGVALUE -> {
-                    final long typedDataValue = dataValue.getLongValue();
-                    final long typedTriggerValue = triggerValue.getLongValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-                
-                case FLOATVALUE -> {
-                    final float typedDataValue = dataValue.getFloatValue();
-                    final float typedTriggerValue = triggerValue.getFloatValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-
-                case DOUBLEVALUE -> {
-                    final double typedDataValue = dataValue.getDoubleValue();
-                    final double typedTriggerValue = triggerValue.getDoubleValue();
-                    triggerResult = checkTrigger(typedDataValue, typedTriggerValue, triggerCondition);
-                }
-
-                case TIMESTAMPVALUE -> {
-                    final Instant dataValueInstant =
-                            TimestampUtility.instantFromTimestamp(dataValue.getTimestampValue());
-                    final Instant triggerValueInstant =
-                            TimestampUtility.instantFromTimestamp(triggerValue.getTimestampValue());
-                    triggerResult = checkTrigger(dataValueInstant, triggerValueInstant, triggerCondition);
-                }
-
-                case BYTEARRAYVALUE, ARRAYVALUE, STRUCTUREVALUE, IMAGEVALUE -> {
-                    resultErrorMsg = "PvConditionTrigger PV data type not supported: " + columnPvName
-                            + " PV data type: " + dataValue.getValueCase().name();
-                    isError = true;
-                }
-
-                case VALUE_NOT_SET -> {
-                    resultErrorMsg = "PvConditionTrigger PV data type not specified: " + columnPvName;
-                    isError = true;
-                }
-
-            }
-
-            if (triggerResult != null) {
-                isTriggered = triggerResult.isTriggered();
-                isError = triggerResult.isError();
-                resultErrorMsg = triggerResult.errorMsg();
-            }
-
-            if (isError) {
-                final String errorMsg =
-                        "PvConditionTrigger error comparing data value for PV name: " + columnPvName
-                                + " msg: " + resultErrorMsg;
-                handleError(errorMsg);
-                return;
-            }
-
-            if (isTriggered) {
-                final Timestamp triggerTimestamp =
-                        DataTimestampsUtility.timestampForIndex(dataTimestamps, columnValueIndex);
-                if (triggerTimestamp == null) {
-                    final String errorMsg = "PvConditionTrigger error getting timestamp for PV: " + columnPvName;
-                    handleError(errorMsg);
-                }
-                handleTriggeredEvent(triggerTimestamp, trigger, dataValue);
-            }
-
-            columnValueIndex = columnValueIndex + 1;
-        }
-    }
-
     private void handleTriggeredEvent(
             Timestamp triggerTimestamp,
             PvConditionTrigger trigger,
@@ -552,6 +382,31 @@ public class EventMonitor {
 
     private void handleSubscribeDataResult(SubscribeDataResponse.SubscribeDataResult result) {
 
+        // Handle each DoubleColumn from result.  A PV might be treated as both a trigger and target PV.
+        for (DoubleColumn doubleColumn : result.getDataFrame().getDoubleColumnsList()) {
+            final String columnName = doubleColumn.getName();
+
+            // handle trigger PVs immediately
+            final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(columnName);
+            if (pvConditionTrigger != null) {
+                ColumnTriggerResult columnTriggerResult =
+                        ColumnTriggerUtility.checkColumnTrigger(
+                                pvConditionTrigger, doubleColumn, result.getDataFrame().getDataTimestamps());
+                if (columnTriggerResult.isError()) {
+                    handleError(columnTriggerResult.errorMsg());
+                }
+                // handle events triggered by column, list might be empty
+                for (ColumnTriggerEvent event : columnTriggerResult.columnTriggerEvents()) {
+                    handleTriggeredEvent(event.triggerTimestamp(), event.trigger(), event.dataValue());
+                }
+            }
+
+//            // Buffer the data for target PVs instead of processing immediately
+//            if (targetPvNames().contains(columnName)) {
+//                bufferManager.bufferData(columnName, doubleColumn, result.getDataFrame().getDataTimestamps());
+//            }
+        }
+
         // Handle each DataColumn from result.  A PV might be treated as both a trigger and target PV.
         for (DataColumn dataColumn : result.getDataFrame().getDataColumnsList()) {
             final String columnName = dataColumn.getName();
@@ -559,7 +414,16 @@ public class EventMonitor {
             // handle trigger PVs immediately
             final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(columnName);
             if (pvConditionTrigger != null) {
-                handleTriggerPVData(pvConditionTrigger, dataColumn, result.getDataFrame().getDataTimestamps());
+                ColumnTriggerResult columnTriggerResult =
+                        ColumnTriggerUtility.checkColumnTrigger(
+                                pvConditionTrigger, dataColumn, result.getDataFrame().getDataTimestamps());
+                if (columnTriggerResult.isError()) {
+                    handleError(columnTriggerResult.errorMsg());
+                }
+                // handle events triggered by column, list might be empty
+                for (ColumnTriggerEvent event : columnTriggerResult.columnTriggerEvents()) {
+                    handleTriggeredEvent(event.triggerTimestamp(), event.trigger(), event.dataValue());
+                }
             }
 
             // Buffer the data for target PVs instead of processing immediately
@@ -584,7 +448,16 @@ public class EventMonitor {
                     handleError(errorMsg);
                     return;
                 }
-                handleTriggerPVData(pvConditionTrigger, dataColumn, result.getDataFrame().getDataTimestamps());
+                ColumnTriggerResult columnTriggerResult =
+                        ColumnTriggerUtility.checkColumnTrigger(
+                                pvConditionTrigger, dataColumn, result.getDataFrame().getDataTimestamps());
+                if (columnTriggerResult.isError()) {
+                    handleError(columnTriggerResult.errorMsg());
+                }
+                // handle events triggered by column, list might be empty
+                for (ColumnTriggerEvent event : columnTriggerResult.columnTriggerEvents()) {
+                    handleTriggeredEvent(event.triggerTimestamp(), event.trigger(), event.dataValue());
+                }
             }
 
             // Buffer the data for target PVs instead of processing immediately.
