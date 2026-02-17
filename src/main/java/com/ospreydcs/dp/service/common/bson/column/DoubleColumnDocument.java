@@ -7,8 +7,6 @@ import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
-import java.util.List;
-
 @BsonDiscriminator(key = "_t", value = "doubleColumn")
 public class DoubleColumnDocument extends ScalarColumnDocumentBase<Double> {
 
