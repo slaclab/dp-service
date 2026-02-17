@@ -3,6 +3,7 @@ package com.ospreydcs.dp.service.ingestionstream.handler;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.service.ingestionstream.handler.monitor.DataBuffer;
+import com.ospreydcs.dp.service.ingestionstream.handler.monitor.EventMonitor;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -34,7 +35,7 @@ public class DataBufferTest {
         DataTimestamps testTimestamps = testResult.getDataFrame().getDataTimestamps();
         
         // Add data to buffer
-        dataBuffer.addData(testColumn, testTimestamps);
+        dataBuffer.addData(EventMonitor.ProtobufColumnType.DATA_COLUMN, testColumn, testTimestamps);
         
         // Initially, item should not be ready to flush (age < maxItemAge)
         assertEquals(0, dataBuffer.getItemsReadyToFlush());
@@ -50,7 +51,11 @@ public class DataBufferTest {
         // Flush and verify aged items are returned
         List<DataBuffer.BufferedData> flushedResults = dataBuffer.flush();
         assertEquals(1, flushedResults.size());
-        assertEquals("test-pv", flushedResults.get(0).getDataColumn().getName());
+        assertEquals(EventMonitor.ProtobufColumnType.DATA_COLUMN, flushedResults.get(0).getProtobufColumnType());
+        Object resultProtobufColumn = flushedResults.get(0).getProtobufColumn();
+        assertTrue(resultProtobufColumn instanceof DataColumn);
+        DataColumn resultColumn = (DataColumn) resultProtobufColumn;
+        assertEquals("test-pv", resultColumn.getName());
         assertEquals(0, dataBuffer.getBufferedItemCount());
     }
 
@@ -58,14 +63,20 @@ public class DataBufferTest {
     public void testPartialFlushingByAge() throws InterruptedException {
         // Add first item
         SubscribeDataResponse.SubscribeDataResult result1 = createTestResult("test-pv", "value1");
-        dataBuffer.addData(result1.getDataFrame().getDataColumns(0), result1.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(
+                EventMonitor.ProtobufColumnType.DATA_COLUMN,
+                result1.getDataFrame().getDataColumns(0),
+                result1.getDataFrame().getDataTimestamps());
         
         // Wait for first item to age
         Thread.sleep(600);
         
         // Add second item (should not be aged yet)
         SubscribeDataResponse.SubscribeDataResult result2 = createTestResult("test-pv", "value2");
-        dataBuffer.addData(result2.getDataFrame().getDataColumns(0), result2.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(
+                EventMonitor.ProtobufColumnType.DATA_COLUMN,
+                result2.getDataFrame().getDataColumns(0),
+                result2.getDataFrame().getDataTimestamps());
         
         // Should have 1 item ready to flush (the aged one)
         assertEquals(1, dataBuffer.getItemsReadyToFlush());
@@ -86,8 +97,14 @@ public class DataBufferTest {
         // Add multiple items with recent timestamps (both younger than maxItemAge)
         SubscribeDataResponse.SubscribeDataResult result1 = createTestResultWithTimestamp("test-pv", "value1", now - 100);
         SubscribeDataResponse.SubscribeDataResult result2 = createTestResultWithTimestamp("test-pv", "value2", now - 200);
-        dataBuffer.addData(result1.getDataFrame().getDataColumns(0), result1.getDataFrame().getDataTimestamps());
-        dataBuffer.addData(result2.getDataFrame().getDataColumns(0), result2.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(
+                EventMonitor.ProtobufColumnType.DATA_COLUMN,
+                result1.getDataFrame().getDataColumns(0),
+                result1.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(
+                EventMonitor.ProtobufColumnType.DATA_COLUMN,
+                result2.getDataFrame().getDataColumns(0),
+                result2.getDataFrame().getDataTimestamps());
         
         // Force flush all items regardless of age
         List<DataBuffer.BufferedData> flushedResults = dataBuffer.forceFlushAll();

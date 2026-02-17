@@ -2,6 +2,7 @@ package com.ospreydcs.dp.service.ingestionstream.handler.monitor;
 
 import com.ospreydcs.dp.grpc.v1.common.DataColumn;
 import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
+import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
 import com.ospreydcs.dp.service.common.protobuf.DataTimestampsUtility;
 import com.ospreydcs.dp.service.common.protobuf.TimestampUtility;
@@ -16,6 +17,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * This class manages buffered data for a single target PV associated with a subscribeDataEvent() handler's
+ * EventMonitor.  It maintains a list of BufferedDataItems, with the policy for aging and flushing buffered data
+ * specified by the DataBufferConfig.
+ *
+ * Each BufferedDataItem contains a protobuf column data type message received via the subscribeData() API response
+ * stream, along with the corresponding DataTimestamps message specifying the timestamps for the column data values.
+ * Each item also includes a timestamp for use in aging buffered data, and an estimated size in bytes for use in
+ * checking response stream message size limits.
+ */
 public class DataBuffer {
 
     private static final Logger logger = LogManager.getLogger();
@@ -30,6 +41,10 @@ public class DataBuffer {
     private long currentBufferSizeBytes = 0;
     private Instant lastFlushTime = Instant.now();
 
+    /**
+     * Specifies the details for aging and flushing the DataBuffer 1) at a specified time interval, 2) at a maximum
+     * buffer size in bytes, 3) at a maximum buffer size in items, and 4) a maximum item age in nanoseconds.
+     */
     public static class DataBufferConfig {
         private final long flushIntervalMs;
         private final long maxBufferSizeBytes;
@@ -58,58 +73,57 @@ public class DataBuffer {
         }
     }
 
+    /**
+     * Encapsulates a PV column data vector in the DataBuffer using ProtobufColumnType to specify the column data type
+     * and protobufColumn to contain the protobuf column message.  Includes dataTimestamps for use in determining if
+     * the buffered data overlaps the time window of a trigered event, a timestamp for aging the item in the buffer,
+     * and an estimated size for use in checking response stream message size limites.
+     */
     private static class BufferedDataItem {
-        private DataColumn dataColumn = null;
-        private SerializedDataColumn serializedDataColumn = null;
+
+        private final EventMonitor.ProtobufColumnType protobufColumnType;
+        private final Object protobufColumn;
         private final DataTimestamps dataTimestamps;
         private final Instant timestamp;
         private final long estimatedSizeBytes;
 
         private BufferedDataItem(
+                EventMonitor.ProtobufColumnType protobufColumnType,
+                Object protobufColumn,
                 DataTimestamps dataTimestamps,
                 long estimatedSizeBytes
         ) {
+            this.protobufColumnType = protobufColumnType;
+            this.protobufColumn = protobufColumn;
             this.dataTimestamps = dataTimestamps;
             this.estimatedSizeBytes = estimatedSizeBytes;
             this.timestamp = Instant.now();
         }
 
-        public BufferedDataItem(
-                DataColumn dataColumn,
-                DataTimestamps dataTimestamps,
-                long estimatedSizeBytes
-        ) {
-            this(dataTimestamps, estimatedSizeBytes);
-            this.dataColumn = dataColumn;
-        }
-
-        public BufferedDataItem(
-                SerializedDataColumn serializedDataColumn,
-                DataTimestamps dataTimestamps,
-                long estimatedSizeBytes
-        ) {
-            this(dataTimestamps, estimatedSizeBytes);
-            this.serializedDataColumn = serializedDataColumn;
-        }
-
-        public DataColumn getDataColumn() { return dataColumn; }
+        public EventMonitor.ProtobufColumnType getProtobufColumnType() { return protobufColumnType; }
+        public Object getProtobufColumn() { return protobufColumn; }
         public DataTimestamps getDataTimestamps() { return dataTimestamps; }
         public Instant getTimestamp() { return timestamp; }
         public long getEstimatedSizeBytes() { return estimatedSizeBytes; }
-        public SerializedDataColumn getSerializedDataColumn() { return serializedDataColumn; }
     }
 
+    /**
+     * Used to deliver BufferedDataItems flushed from the buffer via the DataBufferManager's DataProcessor interface
+     * to the consumer of flushed data for dispatching in the subscribeDataEvent() response stream.
+     */
     public static class BufferedData {
-        private final DataColumn dataColumn;
-        private final SerializedDataColumn serializedDataColumn;
+
+        private final EventMonitor.ProtobufColumnType protobufColumnType;
+        private final Object protobufColumn;
         private final DataTimestamps dataTimestamps;
         private final long estimatedSize;
         private final Instant firstInstant;
         private final Instant lastInstant;
 
         public BufferedData(BufferedDataItem bufferedDataItem) {
-            this.dataColumn = bufferedDataItem.getDataColumn();
-            this.serializedDataColumn = bufferedDataItem.getSerializedDataColumn();
+
+            this.protobufColumnType = bufferedDataItem.protobufColumnType;
+            this.protobufColumn = bufferedDataItem.protobufColumn;
             this.dataTimestamps = bufferedDataItem.getDataTimestamps();
             this.estimatedSize = bufferedDataItem.getEstimatedSizeBytes();
 
@@ -120,8 +134,8 @@ public class DataBuffer {
             lastInstant = TimestampUtility.instantFromTimestamp(dataTimestampsModel.getLastTimestamp());
         }
 
-        public DataColumn getDataColumn() { return dataColumn; }
-        public SerializedDataColumn getSerializedDataColumn() { return serializedDataColumn; }
+        public EventMonitor.ProtobufColumnType getProtobufColumnType() { return protobufColumnType; }
+        public Object getProtobufColumn() { return protobufColumn; }
         public DataTimestamps getDataTimestamps() { return dataTimestamps; }
         public long getEstimatedSize() { return estimatedSize; }
         public Instant getFirstInstant() { return firstInstant; }
@@ -133,11 +147,23 @@ public class DataBuffer {
         this.config = config;
     }
 
-    public void addData(DataColumn dataColumn, DataTimestamps dataTimestamps) {
+    /**
+     * Adds protobuf column data to the DataBuffer's list of items.
+     *
+     * @param protobufColumnType
+     * @param protobufColumn
+     * @param dataTimestamps
+     */
+    public void addData(
+            EventMonitor.ProtobufColumnType protobufColumnType,
+            Object protobufColumn,
+            DataTimestamps dataTimestamps
+    ) {
         writeLock.lock();
         try {
-            long estimatedSize = estimateDataSize(dataColumn);
-            BufferedDataItem item = new BufferedDataItem(dataColumn, dataTimestamps, estimatedSize);
+            long estimatedSize = estimateDataSize(protobufColumnType, protobufColumn);
+            BufferedDataItem item =
+                    new BufferedDataItem(protobufColumnType, protobufColumn, dataTimestamps, estimatedSize);
             
             bufferedItems.add(item);
             currentBufferSizeBytes += estimatedSize;
@@ -149,22 +175,12 @@ public class DataBuffer {
         }
     }
 
-    public void addSerializedData(SerializedDataColumn serializedDataColumn, DataTimestamps dataTimestamps) {
-        writeLock.lock();
-        try {
-            long estimatedSize = estimateSerializedDataSize(serializedDataColumn);
-            BufferedDataItem item = new BufferedDataItem(serializedDataColumn, dataTimestamps, estimatedSize);
-
-            bufferedItems.add(item);
-            currentBufferSizeBytes += estimatedSize;
-
-            logger.debug("Added SerializedDataColumn to buffer for PV: {}, buffer size: {} bytes, {} items",
-                    pvName, currentBufferSizeBytes, bufferedItems.size());
-        } finally {
-            writeLock.unlock();
-        }
-    }
-
+    /**
+     * Determines when its time to flush the DataBuffer by checking if 1) items have exceeded the maximum age,
+     * 2) if the flush time interval has passed, 3) if the buffer size limit in bytes or number of items is surpassed.
+     *
+     * @return
+     */
     public boolean shouldFlush() {
         readLock.lock();
         try {
@@ -191,6 +207,11 @@ public class DataBuffer {
         }
     }
 
+    /**
+     * Flushes and returns items that have reached the configured age from the DataBuffer.
+     *
+     * @return
+     */
     public List<BufferedData> flush() {
         writeLock.lock();
         try {
@@ -247,43 +268,70 @@ public class DataBuffer {
         }
     }
 
-    private long estimateDataSize(DataColumn dataColumn) {
+    /**
+     * Estimates the message size in bytes for the supplied protobufColumn, using the column data type to determine
+     * the estimate.
+     *
+     * @param protobufColumnType
+     * @param protobufColumn
+     * @return
+     */
+    private long estimateDataSize(
+            EventMonitor.ProtobufColumnType protobufColumnType,
+            Object protobufColumn
+    ) {
         AtomicLong size = new AtomicLong(100); // Base overhead for timestamps and structure
-        
-        size.addAndGet(dataColumn.getName().length() * 2); // String overhead
-        size.addAndGet(dataColumn.getDataValuesList().size() * 50); // Base per-value overhead
-        
-        dataColumn.getDataValuesList().forEach(dataValue -> {
-            switch (dataValue.getValueCase()) {
-                case STRINGVALUE:
-                    size.addAndGet(dataValue.getStringValue().length() * 2);
-                    break;
-                case BYTEARRAYVALUE:
-                    size.addAndGet(dataValue.getByteArrayValue().size());
-                    break;
-                case ARRAYVALUE:
-                    size.addAndGet(dataValue.getArrayValue().getDataValuesCount() * 32);
-                    break;
-                case STRUCTUREVALUE:
-                    size.addAndGet(dataValue.getStructureValue().getFieldsCount() * 64);
-                    break;
-                case IMAGEVALUE:
-                    size.addAndGet(dataValue.getImageValue().getImage().size());
-                    break;
-                default:
-                    size.addAndGet(8); // Primitive types
-                    break;
-            }
-        });
-        
-        return size.get();
-    }
 
-    private long estimateSerializedDataSize(SerializedDataColumn serializedDataColumn) {
-        AtomicLong size = new AtomicLong(100); // Base overhead for timestamps and structure
-        size.addAndGet(serializedDataColumn.getName().length() * 2); // String overhead
-        size.addAndGet(50); // Base overhead for data column bytes.
-        size.addAndGet(serializedDataColumn.getSerializedSize());
+        switch (protobufColumnType) {
+
+            case DATA_COLUMN -> { // protobufColumn is an instance of DataColumn
+                if (protobufColumn instanceof DataColumn) {
+                    final DataColumn dataColumn = (DataColumn) protobufColumn;
+                    size.addAndGet(dataColumn.getName().length() * 2); // String overhead
+                    size.addAndGet(dataColumn.getDataValuesList().size() * 50); // Base per-value overhead
+                    dataColumn.getDataValuesList().forEach(dataValue -> {
+                        switch (dataValue.getValueCase()) {
+                            case STRINGVALUE:
+                                size.addAndGet(dataValue.getStringValue().length() * 2);
+                                break;
+                            case BYTEARRAYVALUE:
+                                size.addAndGet(dataValue.getByteArrayValue().size());
+                                break;
+                            case ARRAYVALUE:
+                                size.addAndGet(dataValue.getArrayValue().getDataValuesCount() * 32);
+                                break;
+                            case STRUCTUREVALUE:
+                                size.addAndGet(dataValue.getStructureValue().getFieldsCount() * 64);
+                                break;
+                            case IMAGEVALUE:
+                                size.addAndGet(dataValue.getImageValue().getImage().size());
+                                break;
+                            default:
+                                size.addAndGet(8); // Primitive types
+                                break;
+                        }
+                    });
+                }
+            }
+
+            case SERIALIZED_DATA_COLUMN -> {
+                if (protobufColumn instanceof SerializedDataColumn) {
+                    final SerializedDataColumn serializedDataColumn = (SerializedDataColumn) protobufColumn;
+                    size.addAndGet(serializedDataColumn.getName().length() * 2); // String overhead
+                    size.addAndGet(50); // Base overhead for data column bytes.
+                    size.addAndGet(serializedDataColumn.getSerializedSize());
+                }
+            }
+
+            case DOUBLE_COLUMN -> {
+                if (protobufColumn instanceof DoubleColumn) {
+                    final DoubleColumn doubleColumn = (DoubleColumn) protobufColumn;
+                    size.addAndGet(doubleColumn.getName().length() * 2);
+                    size.addAndGet(doubleColumn.getValuesCount() * 8); // number of list elements * primitive size
+                }
+            }
+        }
+
         return size.get();
     }
 

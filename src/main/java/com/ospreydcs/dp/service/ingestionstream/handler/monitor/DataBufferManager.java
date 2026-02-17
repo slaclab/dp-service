@@ -2,10 +2,12 @@ package com.ospreydcs.dp.service.ingestionstream.handler.monitor;
 
 import com.ospreydcs.dp.grpc.v1.common.DataColumn;
 import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
+import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.xml.crypto.Data;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,6 +15,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * This class is used to buffer target PV data for the EventMonitor created to manage a subscribeDataEvent()
+ * subscription.
+ *
+ * It uses a DataBuffer for each target PV specified in the subscription, with the pvBuffers map containing an entry
+ * for each.  It uses the flushScheduler thread pool to manage flushing the data buffers at the configured interval.
+ * It defines the DataProcessor interface, which is implemented by the client EventMonitor to receive data flushed
+ * from buffers.
+ */
 public class DataBufferManager {
 
     private static final Logger logger = LogManager.getLogger();
@@ -33,23 +44,15 @@ public class DataBufferManager {
         startPeriodicFlush();
     }
 
-    public void bufferData(String pvName, DataColumn dataColumn, DataTimestamps dataTimestamps) {
-        DataBuffer buffer = pvBuffers.computeIfAbsent(pvName, k -> new DataBuffer(k, config));
-        buffer.addData(dataColumn, dataTimestamps);
-        
-        if (buffer.shouldFlush()) {
-            flushBuffer(pvName, buffer);
-        }
-    }
-
-    public void bufferSerializedData(
+    public void bufferData(
             String pvName,
-            SerializedDataColumn serializedDataColumn,
+            EventMonitor.ProtobufColumnType protobufColumnType,
+            Object protobufColumn,
             DataTimestamps dataTimestamps
     ) {
         DataBuffer buffer = pvBuffers.computeIfAbsent(pvName, k -> new DataBuffer(k, config));
-        buffer.addSerializedData(serializedDataColumn, dataTimestamps);
-
+        buffer.addData(protobufColumnType, protobufColumn, dataTimestamps);
+        
         if (buffer.shouldFlush()) {
             flushBuffer(pvName, buffer);
         }

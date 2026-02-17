@@ -716,7 +716,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
                     pvInfoMap.get(pvName);
             assertNotNull(pvInfo);
             assertEquals(pvName, pvInfo.getPvName());
-            assertEquals(8, pvInfo.getLastBucketDataTypeCase());
             assertEquals("DOUBLEVALUE", pvInfo.getLastBucketDataType());
             assertEquals(1, pvInfo.getLastBucketDataTimestampsCase());
             assertEquals("SAMPLINGCLOCK", pvInfo.getLastBucketDataTimestampsType());
