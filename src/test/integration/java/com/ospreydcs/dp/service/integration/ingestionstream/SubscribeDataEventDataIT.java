@@ -17,6 +17,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This class provides integration test coverage for the subscribeDataEvent() API method.
+ */
 public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
 
     // static variables
@@ -32,6 +35,13 @@ public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
         super.tearDown();
     }
 
+    /**
+     * This test case provides positive test coverage for 3 different subscribeDataEvent() scenarios exercising details
+     * of the PvConditionTrigger and DataEventOperation messages.  It runs a simple ingestion scneario (necessary
+     * before subscribing because of PV validation), then creates 3 subscriptions via subscribeDataEvent().  It then
+     * runs another ingestion scenario that causes messages to be published in the subscribeDataEvent() response streams,
+     * and then confirms that the messages received in the response streams are as expected.
+     */
     @Test
     public void testSubscribeDataEventData() {
 
@@ -320,35 +330,36 @@ public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
         // request 1: verify subscribeDataEvent() responses and close request stream explicitly with onCompleted().
         ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall1.responseObserver(),
-                requestParams1,
-                ingestionScenarioResult.validationMap(),
                 expectedEventResponses1,
                 expectedEventDataResponses1,
-                0);
+                0,
+                null);
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall1);
 
         // request 2: verify subscribeDataEvent() responses and close request stream explicitly with cancel request.
         ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall2.responseObserver(),
-                requestParams2,
-                ingestionScenarioResult.validationMap(),
                 expectedEventResponses2,
                 expectedEventDataResponses2,
-                0);
+                0,
+                null);
         ingestionStreamServiceWrapper.cancelSubscribeDataEventCall(subscribeDataEventCall2);
 
         // request 3: verify subscribeDataEvent() responses and let server close API stream implicitly
         ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall3.responseObserver(),
-                requestParams3,
-                ingestionScenarioResult.validationMap(),
                 expectedEventResponses3,
                 expectedEventDataResponses3,
-                0);
+                0,
+                null);
 //        subscribeDataEventCall3.requestObserver().onCompleted();
 
     }
 
+    /**
+     * This test case provides negative test coverage for various scenarios that cause the subscribeDataEvent() request
+     * to be rejectd.  The individual scenarios are described inline.
+     */
     @Test
     public void testSubscribeDataEventDataReject() {
 

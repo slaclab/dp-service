@@ -1,11 +1,16 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
+import com.ospreydcs.dp.grpc.v1.common.DataValue;
 import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
+import com.ospreydcs.dp.grpc.v1.common.Timestamp;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
+import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
+import com.ospreydcs.dp.grpc.v1.ingestionstream.SubscribeDataEventResponse;
 import com.ospreydcs.dp.service.ingest.IngestionTestBase;
 import com.ospreydcs.dp.service.ingest.utility.SubscribeDataUtility;
+import com.ospreydcs.dp.service.ingestionstream.IngestionStreamTestBase;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationTestBase;
 import com.ospreydcs.dp.service.query.QueryTestBase;
 import org.junit.After;
@@ -15,10 +20,11 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
+/**
+ * This integration test covers the use of protobuf DoubleColumns in the MLDP APIs.
+ */
 public class DoubleColumnIT extends GrpcIntegrationTestBase {
 
     @Before
@@ -32,13 +38,15 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
     }
 
     /**
-     * Covers use in the APIs of the DoubleColumn protobuf message.  Registers a provider, which is required before
+     * This test case provides full MLDP API coverage for use of DoubleColumns.
+     * Registers a provider, which is required before
      * using the ingestion APIs.  Uses the data ingestion API to send an IngestDataRequest whose IngestionDataFrame
      * contains a DoubleColumn data structure.  Uses the time-series data query API to retrieve the bucket containing
      * the DataColumn sent in the ingestion request.  Confirms that the DoubleColumn retrieved via the query API matches
      * the column sent in the ingestion request, using DataColumn.equals() which compares column name and data values
      * in the two columns.  Subscribes for PV data via the subscribeData() API method and confirms that the data
-     * received in the subscription response stream matches the ingested data.
+     * received in the subscription response stream matches the ingested data.  Registers via subscribeDataEvent() for
+     * data events and confirms that the appropriate responses are received.
      */
     @Test
     public void doubleColumnTest() {
@@ -50,19 +58,16 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             providerId = ingestionServiceWrapper.registerProvider(providerName, null);
         }
 
-        List<String> columnNames;
-        long firstSeconds;
-        long firstNanos;
+        final String pvName = "pv_08";
+        List<String> columnNames = Arrays.asList(pvName);
+        long firstSeconds = Instant.now().getEpochSecond();
+        long firstNanos = 0L;
         IngestionTestBase.IngestionRequestParams ingestionRequestParams;
         DoubleColumn requestDoubleColumn;
         {
             // positive unary ingestion test for DoubleColumn
             // assemble IngestionRequest
             final String requestId = "request-8";
-            final String pvName = "pv_08";
-            columnNames = Arrays.asList(pvName);
-            firstSeconds = Instant.now().getEpochSecond();
-            firstNanos = 0L;
             final long sampleIntervalNanos = 1_000_000L;
             final int numSamples = 2;
 
@@ -147,13 +152,76 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                             columnNames, expectedResponseCount, expectReject, expectedRejectMessage);
         }
 
-        // ingest data that will be published to subscription
+        // create a data event subscription
+        IngestionStreamTestBase.SubscribeDataEventCall subscribeDataEventCall;
+        IngestionStreamTestBase.SubscribeDataEventRequestParams requestParams;
+        Map<PvConditionTrigger, List<SubscribeDataEventResponse.Event>> expectedEventResponses = new HashMap<>();
+        Map<SubscribeDataEventResponse.Event, Map<String, List<Instant>>> expectedEventDataResponses = new HashMap<>();
+        int expectedEventResponseCount = 0;
+        {
+            // create list of triggers for request
+            List<PvConditionTrigger> requestTriggers = new ArrayList<>();
+
+            // create trigger
+            SubscribeDataEventResponse.Event event;
+            {
+                PvConditionTrigger trigger = PvConditionTrigger.newBuilder()
+                        .setPvName(pvName)
+                        .setCondition(PvConditionTrigger.PvCondition.PV_CONDITION_EQUAL_TO)
+                        .setValue(DataValue.newBuilder().setDoubleValue(98.76).build())
+                        .build();
+                requestTriggers.add(trigger);
+
+                // add entry to response verification map with trigger and expected TriggeredEvent responses
+                final List<SubscribeDataEventResponse.Event> triggerExpectedEvents = new ArrayList<>();
+                final DataValue eventDataValue = DataValue.newBuilder().setDoubleValue(98.76).build();
+                event = SubscribeDataEventResponse.Event.newBuilder()
+                        .setTrigger(trigger)
+                        .setDataValue(eventDataValue)
+                        .setEventTime(Timestamp.newBuilder().setEpochSeconds(firstSeconds+1).build())
+                        .build();
+                triggerExpectedEvents.add(event);
+                expectedEventResponses.put(trigger, triggerExpectedEvents);
+                expectedEventResponseCount += triggerExpectedEvents.size();
+            }
+
+            // DataEventOperation details for params
+            final List<String> targetPvs = List.of(pvName);
+            final long offset = -3_000_000_000L; // 3 seconds negative trigger time offset
+            final long duration = 5_000_000_000L; // 5 second duration
+
+            // add entry for event to response verification map with details about expected EventData responses
+            final int expectedDataBucketCount = 1;
+            final List<Instant> instantList = List.of(Instant.ofEpochSecond(firstSeconds + 1));
+            final Map<String, List<Instant>> pvInstantMap = new HashMap<>();
+            expectedEventDataResponses.put(event, pvInstantMap);
+            pvInstantMap.put(pvName, instantList);
+
+            // create params object (including trigger params list) for building protobuf request from params
+            requestParams =
+                    new IngestionStreamTestBase.SubscribeDataEventRequestParams(
+                            requestTriggers,
+                            targetPvs,
+                            offset,
+                            duration);
+
+            // call subscribeDataEvent() to initiate subscription before running ingestion
+            final boolean expectReject = false;
+            final String expectedRejectMessage = "";
+            subscribeDataEventCall = ingestionStreamServiceWrapper.initiateSubscribeDataEventRequest(
+                    requestParams,
+                    expectedEventResponseCount,
+                    expectedDataBucketCount,
+                    expectReject,
+                    expectedRejectMessage);
+        }
+
+        // ingest data that will be published data subscription and trigger data event subscription
         DoubleColumn subscriptionColumn;
         {
             // positive unary ingestion test for DoubleColumn
             // assemble IngestionRequest
             final String requestId = "request-9";
-            final String pvName = "pv_08";
             columnNames = Arrays.asList(pvName);
             final long sampleIntervalNanos = 1_000_000L;
             final int numSamples = 2;
@@ -193,7 +261,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
         }
 
-        // check that expected subscription response is received
+        // check that expected subscribeData() response is received
         {
             final IngestionTestBase.SubscribeDataResponseObserver responseObserver =
                     (IngestionTestBase.SubscribeDataResponseObserver) subscribeDataCall.responseObserver();
@@ -213,6 +281,16 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             assertEquals(subscriptionColumn, responseBucket.getDoubleColumn());
         }
 
+        // check that expected subscribeDataEvent() responses are received
+        final List<DataBucket> responseDataBuckets = ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
+                (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
+                expectedEventResponses,
+                expectedEventDataResponses,
+                0,
+                DataBucket.DataCase.DOUBLECOLUMN);
+        assertEquals(1, responseDataBuckets.size());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDoubleColumn());
+        ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 
 }

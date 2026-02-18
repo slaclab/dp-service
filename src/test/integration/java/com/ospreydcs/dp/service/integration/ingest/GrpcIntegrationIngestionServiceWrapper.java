@@ -36,7 +36,7 @@ import static org.mockito.Mockito.mock;
 
 /**
  * This class provides utilities for calling various Ingestion Service API methods in integration tests that use the
- * in-process gRPC communication framework.  For each API method, it provides uitility methods for sending the API
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
  * method request and verifying the result.
  */
 public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServiceWrapperBase<IngestionServiceImpl> {

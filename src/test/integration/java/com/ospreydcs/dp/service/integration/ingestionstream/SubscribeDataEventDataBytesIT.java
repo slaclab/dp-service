@@ -19,6 +19,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This class provides integration test coverage for the subscribeDataEvent() API method with scenarios that use
+ * SerializedDataColumns for ingestion and the publication response streams.
+ */
 public class SubscribeDataEventDataBytesIT extends AnnotationIntegrationTestIntermediate {
 
     // static variables
@@ -34,6 +38,14 @@ public class SubscribeDataEventDataBytesIT extends AnnotationIntegrationTestInte
         super.tearDown();
     }
 
+    /**
+     * This test case provides positive test coverage for a subscribeDataEvent() using SerializedDataColumns in the
+     * ingestion requests so that we can confirm that SerializedDataColumns are also received in the subscription
+     * response stream. It runs a simple ingestion scneario (necessary
+     * before subscribing because of PV validation), then creates a subscription via subscribeDataEvent().  It then
+     * runs another ingestion scenario that causes messages to be published in the subscribeDataEvent() response streams,
+     * and then confirms that the messages received in the response stream are as expected.
+     */
     @Test
     public void testSubscribeDataEventDataBytes() {
 
@@ -136,11 +148,10 @@ public class SubscribeDataEventDataBytesIT extends AnnotationIntegrationTestInte
         // request 1: verify subscribeDataEvent() responses and close request stream explicitly with onCompleted().
         ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall1.responseObserver(),
-                requestParams1,
-                ingestionValidationMap,
                 expectedEventResponses1,
                 expectedEventDataResponses1,
-                expectedDataBucketCount1);
+                expectedDataBucketCount1,
+                null);
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall1);
 
     }
