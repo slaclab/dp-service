@@ -14,6 +14,7 @@ import io.grpc.stub.StreamObserver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServiceImplBase {
@@ -520,11 +521,12 @@ public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServ
     }
 
     private static SubscribeDataResponse subscribeDataResponse(
-            DataFrame dataFrame
+            DataBucket dataBucket
     ) {
+        final List<DataBucket> responseDataBuckets = List.of(dataBucket);
         final SubscribeDataResponse.SubscribeDataResult result =
                 SubscribeDataResponse.SubscribeDataResult.newBuilder()
-                        .setDataFrame(dataFrame)
+                        .addAllDataBuckets(responseDataBuckets)
                         .build();
         return subscribeDataResponse(result);
     }
@@ -551,10 +553,10 @@ public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServ
     }
 
     public static void sendSubscribeDataResponse(
-            DataFrame dataFrame,
+            DataBucket dataBucket,
             StreamObserver<SubscribeDataResponse> responseObserver
     ) {
-        final SubscribeDataResponse response = subscribeDataResponse(dataFrame);
+        final SubscribeDataResponse response = subscribeDataResponse(dataBucket);
         responseObserver.onNext(response);
     }
 

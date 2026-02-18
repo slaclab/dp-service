@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.ingestionstream.handler.monitor;
 
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
-import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
-import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -46,12 +43,10 @@ public class DataBufferManager {
 
     public void bufferData(
             String pvName,
-            EventMonitor.ProtobufColumnType protobufColumnType,
-            Object protobufColumn,
-            DataTimestamps dataTimestamps
+            DataBucket dataBucket
     ) {
         DataBuffer buffer = pvBuffers.computeIfAbsent(pvName, k -> new DataBuffer(k, config));
-        buffer.addData(protobufColumnType, protobufColumn, dataTimestamps);
+        buffer.addData(dataBucket);
         
         if (buffer.shouldFlush()) {
             flushBuffer(pvName, buffer);

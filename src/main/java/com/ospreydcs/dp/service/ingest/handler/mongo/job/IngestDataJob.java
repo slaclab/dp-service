@@ -17,8 +17,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
+/**
+ * This class is created to service an IngestDataRequest received by one of the data ingestion API methods. The
+ * execute() method is dispatched to handleIngestionRequest(), which does the core work of the Ingestion Service.
+ */
 public class IngestDataJob extends HandlerJob {
 
     // static variables
@@ -44,6 +47,15 @@ public class IngestDataJob extends HandlerJob {
         this.handleIngestionRequest(request);
     }
 
+    /**
+     * Handles an IngestDataRequest received by one of the data ingestion API methods.  Checks that specified providerId
+     * is valid by database lookup. Generates a batch of BSON BucketDocuments, one for each data column in the request.
+     * Inserts the batch of documents to MongoDB, and verifies handling. Inserts a RequestStatusDocument in MongoDB for
+     * checking the status of the request asynchronously.  Publishes data columns for subscribed PVs.
+     *
+     * @param handlerIngestionRequest
+     * @return
+     */
     public HandlerIngestionResult handleIngestionRequest(HandlerIngestionRequest handlerIngestionRequest) {
 
         final IngestDataRequest request = handlerIngestionRequest.request;
@@ -54,7 +66,6 @@ public class IngestDataJob extends HandlerJob {
         boolean isError = false;
         String errorMsg = "";
         List<String> idsCreated = new ArrayList<>();
-        Set<String> requestPvs = new HashSet<>();
 
         // validate providerId by getting providerName
         String providerName = mongoClient.providerNameForId(request.getProviderId());
@@ -89,11 +100,6 @@ public class IngestDataJob extends HandlerJob {
                     // add the batch to mongo and handle result
                     IngestionTaskResult ingestionTaskResult =
                             mongoClient.insertBatch(request, dataDocumentBatch);
-
-                    // collect a set of PV names in the request's BucketDocuments
-                    requestPvs = dataDocumentBatch.stream()
-                            .map(BucketDocument::getPvName)
-                            .collect(Collectors.toSet());
 
                     if (ingestionTaskResult.isError) {
                         isError = true;
@@ -162,8 +168,8 @@ public class IngestDataJob extends HandlerJob {
         }
 
         // publish request PV data to subscribeData() subscribers
-        if (! isError && requestPvs.size() > 0) {
-            handler.getSourceMonitorPublisher().publishDataSubscriptions(request, requestPvs);
+        if (! isError) {
+            handler.getSourceMonitorPublisher().publishDataSubscriptions(request, providerName);
         }
 
         return new HandlerIngestionResult(isError, errorMsg);

@@ -7,10 +7,16 @@ import com.ospreydcs.dp.service.ingestionstream.handler.monitor.EventMonitor;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
+/**
+ * Provides unit test coverage for the subscribeDataEvent framework's DataBuffer mechanism, which is used by the
+ * EventMonitor to buffer target PV data from the subscribeData() response stream with a configurable flushing
+ * mechanism.  This class's test cases cover various aspects of the flushing mechanism.
+ */
 public class DataBufferTest {
 
     private DataBuffer dataBuffer;
@@ -31,11 +37,10 @@ public class DataBufferTest {
     public void testAgeBasedFlushing() throws InterruptedException {
         // Create test data
         SubscribeDataResponse.SubscribeDataResult testResult = createTestResult("test-pv", "test-value");
-        DataColumn testColumn = testResult.getDataFrame().getDataColumns(0);
-        DataTimestamps testTimestamps = testResult.getDataFrame().getDataTimestamps();
-        
+        DataBucket dataBucket = testResult.getDataBuckets(0);
+
         // Add data to buffer
-        dataBuffer.addData(EventMonitor.ProtobufColumnType.DATA_COLUMN, testColumn, testTimestamps);
+        dataBuffer.addData(dataBucket);
         
         // Initially, item should not be ready to flush (age < maxItemAge)
         assertEquals(0, dataBuffer.getItemsReadyToFlush());
@@ -51,10 +56,9 @@ public class DataBufferTest {
         // Flush and verify aged items are returned
         List<DataBuffer.BufferedData> flushedResults = dataBuffer.flush();
         assertEquals(1, flushedResults.size());
-        assertEquals(EventMonitor.ProtobufColumnType.DATA_COLUMN, flushedResults.get(0).getProtobufColumnType());
-        Object resultProtobufColumn = flushedResults.get(0).getProtobufColumn();
-        assertTrue(resultProtobufColumn instanceof DataColumn);
-        DataColumn resultColumn = (DataColumn) resultProtobufColumn;
+        DataBucket flushedBucket = flushedResults.get(0).getDataBucket();
+        assertEquals(dataBucket, flushedBucket);
+        DataColumn resultColumn = flushedBucket.getDataColumn();
         assertEquals("test-pv", resultColumn.getName());
         assertEquals(0, dataBuffer.getBufferedItemCount());
     }
@@ -63,20 +67,14 @@ public class DataBufferTest {
     public void testPartialFlushingByAge() throws InterruptedException {
         // Add first item
         SubscribeDataResponse.SubscribeDataResult result1 = createTestResult("test-pv", "value1");
-        dataBuffer.addData(
-                EventMonitor.ProtobufColumnType.DATA_COLUMN,
-                result1.getDataFrame().getDataColumns(0),
-                result1.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(result1.getDataBuckets(0));
         
         // Wait for first item to age
         Thread.sleep(600);
         
         // Add second item (should not be aged yet)
         SubscribeDataResponse.SubscribeDataResult result2 = createTestResult("test-pv", "value2");
-        dataBuffer.addData(
-                EventMonitor.ProtobufColumnType.DATA_COLUMN,
-                result2.getDataFrame().getDataColumns(0),
-                result2.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(result2.getDataBuckets(0));
         
         // Should have 1 item ready to flush (the aged one)
         assertEquals(1, dataBuffer.getItemsReadyToFlush());
@@ -97,14 +95,8 @@ public class DataBufferTest {
         // Add multiple items with recent timestamps (both younger than maxItemAge)
         SubscribeDataResponse.SubscribeDataResult result1 = createTestResultWithTimestamp("test-pv", "value1", now - 100);
         SubscribeDataResponse.SubscribeDataResult result2 = createTestResultWithTimestamp("test-pv", "value2", now - 200);
-        dataBuffer.addData(
-                EventMonitor.ProtobufColumnType.DATA_COLUMN,
-                result1.getDataFrame().getDataColumns(0),
-                result1.getDataFrame().getDataTimestamps());
-        dataBuffer.addData(
-                EventMonitor.ProtobufColumnType.DATA_COLUMN,
-                result2.getDataFrame().getDataColumns(0),
-                result2.getDataFrame().getDataTimestamps());
+        dataBuffer.addData(result1.getDataBuckets(0));
+        dataBuffer.addData(result2.getDataBuckets(0));
         
         // Force flush all items regardless of age
         List<DataBuffer.BufferedData> flushedResults = dataBuffer.forceFlushAll();
@@ -141,10 +133,15 @@ public class DataBufferTest {
             .setSamplingClock(clock)
             .build();
 
-        DataFrame dataFrame = DataFrame.newBuilder().setDataTimestamps(timestamps).addDataColumns(dataColumn).build();
-        
+        DataBucket dataBucket = DataBucket.newBuilder()
+                .setPvName(pvName)
+                .setDataColumn(dataColumn)
+                .setDataTimestamps(timestamps)
+                .build();
+        List<DataBucket> dataBuckets = Collections.singletonList(dataBucket);
+
         return SubscribeDataResponse.SubscribeDataResult.newBuilder()
-            .setDataFrame(dataFrame)
+            .addAllDataBuckets(dataBuckets)
             .build();
     }
 }

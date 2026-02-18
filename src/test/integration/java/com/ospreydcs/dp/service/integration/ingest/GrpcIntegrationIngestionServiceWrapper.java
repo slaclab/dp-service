@@ -34,6 +34,11 @@ import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Ingestion Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides uitility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServiceWrapperBase<IngestionServiceImpl> {
 
     // static variables
@@ -1088,33 +1093,68 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
 
             assertTrue(response.hasSubscribeDataResult());
             final SubscribeDataResponse.SubscribeDataResult responseResult = response.getSubscribeDataResult();
-            final DataTimestamps responseDataTimestamps = responseResult.getDataFrame().getDataTimestamps();
-            final DataTimestampsUtility.DataTimestampsModel responseTimestampsModel = 
-                    new DataTimestampsUtility.DataTimestampsModel(responseDataTimestamps);
-            final long responseSeconds = responseTimestampsModel.getFirstTimestamp().getEpochSeconds();
-            final long responseNanos = responseTimestampsModel.getFirstTimestamp().getNanoseconds();
 
-            // add entries to pvTimestampColumnMap for regular DataColumns in response
-            for (DataColumn dataColumn : responseResult.getDataFrame().getDataColumnsList()) {
-                addPvTimestampColumnMapEntry(
-                        pvTimestampColumnMap, responseSeconds, responseNanos, dataColumn, false);
-                responseColumnCount = responseColumnCount + 1;
-            }
+            for (DataBucket dataBucket : responseResult.getDataBucketsList()) {
 
-            // add entries to pvTimestampColumnMap for SerializedDataColumns in response
-            for (SerializedDataColumn serializedDataColumn : responseResult.getDataFrame().getSerializedDataColumnsList()) {
-                DataColumn deserializedDataColumn = null;
-                try {
-                    deserializedDataColumn = DataColumn.parseFrom(serializedDataColumn.getPayload());
-                } catch (InvalidProtocolBufferException e) {
-                    fail("exception deserializing response SerializedDataColumn: " + e.getMessage());
+                final DataTimestamps responseDataTimestamps = dataBucket.getDataTimestamps();
+                final DataTimestampsUtility.DataTimestampsModel responseTimestampsModel =
+                        new DataTimestampsUtility.DataTimestampsModel(responseDataTimestamps);
+                final long responseSeconds = responseTimestampsModel.getFirstTimestamp().getEpochSeconds();
+                final long responseNanos = responseTimestampsModel.getFirstTimestamp().getNanoseconds();
+
+                switch (dataBucket.getDataCase()) {
+                    case DATACOLUMN -> {
+                        // add entries to pvTimestampColumnMap for regular DataColumns in response
+                        final DataColumn dataColumn = dataBucket.getDataColumn();
+                        addPvTimestampColumnMapEntry(
+                                pvTimestampColumnMap, responseSeconds, responseNanos, dataColumn, false);
+                        responseColumnCount = responseColumnCount + 1;
+                    }
+                    case SERIALIZEDDATACOLUMN -> {
+                        DataColumn deserializedDataColumn = null;
+                        try {
+                            deserializedDataColumn =
+                                    DataColumn.parseFrom(dataBucket.getSerializedDataColumn().getPayload());
+                        } catch (InvalidProtocolBufferException e) {
+                            fail("exception deserializing response SerializedDataColumn: " + e.getMessage());
+                        }
+                        assertNotNull(deserializedDataColumn);
+                        addPvTimestampColumnMapEntry(
+                                pvTimestampColumnMap, responseSeconds, responseNanos, deserializedDataColumn, true);
+                        responseColumnCount = responseColumnCount + 1;
+                    }
+                    case DOUBLECOLUMN -> {
+                    }
+                    case FLOATCOLUMN -> {
+                    }
+                    case INT64COLUMN -> {
+                    }
+                    case INT32COLUMN -> {
+                    }
+                    case BOOLCOLUMN -> {
+                    }
+                    case STRINGCOLUMN -> {
+                    }
+                    case ENUMCOLUMN -> {
+                    }
+                    case IMAGECOLUMN -> {
+                    }
+                    case STRUCTCOLUMN -> {
+                    }
+                    case DOUBLEARRAYCOLUMN -> {
+                    }
+                    case FLOATARRAYCOLUMN -> {
+                    }
+                    case INT32ARRAYCOLUMN -> {
+                    }
+                    case INT64ARRAYCOLUMN -> {
+                    }
+                    case BOOLARRAYCOLUMN -> {
+                    }
+                    case DATA_NOT_SET -> {
+                    }
                 }
-                assertNotNull(deserializedDataColumn);
-                addPvTimestampColumnMapEntry(
-                        pvTimestampColumnMap, responseSeconds, responseNanos, deserializedDataColumn, true);
-                responseColumnCount = responseColumnCount + 1;
             }
-
         }
 
         // confirm that we received the expected DataColumns in subscription responses

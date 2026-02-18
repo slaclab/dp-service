@@ -87,15 +87,6 @@ public class EventMonitor {
     protected final SubscribeDataCallManager subscribeDataCallManager;
     private final AtomicBoolean shutdownRequested = new AtomicBoolean(false);
 
-    /**
-     * Specifies the datatype of a protobuf column, for use in buffering data for target PVs via the DataBufferManager.
-     */
-    public static enum ProtobufColumnType {
-        DATA_COLUMN,
-        SERIALIZED_DATA_COLUMN,
-        DOUBLE_COLUMN
-    }
-
     // configuration accessors
     protected static ConfigurationManager configMgr() {
         return ConfigurationManager.getInstance();
@@ -365,49 +356,7 @@ public class EventMonitor {
                     continue;
                 }
 
-                // Create DataBucket for this BufferedData item
-                final DataBucket.Builder dataBucketBuilder = DataBucket.newBuilder();
-                dataBucketBuilder.setDataTimestamps(bufferedData.getDataTimestamps());
-
-                switch (bufferedData.getProtobufColumnType()) {
-
-                    case DATA_COLUMN -> {
-                        if (bufferedData.getProtobufColumn() instanceof DataColumn) {
-                            dataBucketBuilder.setDataColumn((DataColumn) bufferedData.getProtobufColumn());
-                        } else {
-                            final String errorMsg =
-                                    "handleTargetPvData() downcast error, expected DataColumn, received: "
-                                    + bufferedData.getProtobufColumn().getClass().getName();
-                            handleError(errorMsg);
-                        }
-                    }
-
-                    case SERIALIZED_DATA_COLUMN -> {
-                        if (bufferedData.getProtobufColumn() instanceof SerializedDataColumn) {
-                            dataBucketBuilder.setSerializedDataColumn(
-                                    (SerializedDataColumn) bufferedData.getProtobufColumn());
-                        } else {
-                            final String errorMsg =
-                                    "handleTargetPvData() downcast error, expected SerializedDataColumn, received: "
-                                            + bufferedData.getProtobufColumn().getClass().getName();
-                            handleError(errorMsg);
-                        }
-                    }
-
-                    case DOUBLE_COLUMN -> {
-                        if (bufferedData.getProtobufColumn() instanceof DoubleColumn) {
-                            dataBucketBuilder.setDoubleColumn((DoubleColumn) bufferedData.getProtobufColumn());
-                        } else {
-                            final String errorMsg =
-                                    "handleTargetPvData() downcast error, expected DoubleColumn, received: "
-                                            + bufferedData.getProtobufColumn().getClass().getName();
-                            handleError(errorMsg);
-                        }
-                    }
-                }
-
-                final DataBucket dataBucket = dataBucketBuilder.build();
-
+                final DataBucket dataBucket = bufferedData.getDataBucket();
                 final long bucketSize = bufferedData.getEstimatedSize();
 
                 // Check if adding this bucket would exceed message size limit
@@ -460,51 +409,23 @@ public class EventMonitor {
 
     /**
      * Handles incoming data from the subscribeData() API response stream for the trigger and target PVs associated with
-     * this subscription. The result messages in the response stream contain DataFrame messages passed along from the
-     * data ingestion stream. Each DataFrame contains lists of the supported protobuf column data types supported for
-     * ingestion. At least one of the columns in the DataFrame is associated with a PV used in this
-     * DataEventSubscription. The DataFrame might contain columns for PVs that we didn't subscribe too because of the
-     * way PVs are packaged in data ingestion - those columns are simply ignored.
+     * this subscription. The result messages in the response stream contain DataBuckets passed along from the
+     * data ingestion stream. Each DataBucket contains a single column of one of the supported protobuf column data types.
      *
-     * Data are dispatched to methods for handling each of the supported column data types.  Those methods determine
-     * whether the arriving column data should be handled as trigger or target PVs, or ignored.
+     * Each DataBucket is processed and handled appropriately depending on whether the associated PV is a trigger PV,
+     * target PV, or both.
      *
      * @param result
      */
     private void handleSubscribeDataResult(SubscribeDataResponse.SubscribeDataResult result) {
-        handleSubscribeDataResultDataColumns(
-                result.getDataFrame().getDataColumnsList(),
-                result.getDataFrame().getDataTimestamps());
-        handleSubscribeDataResultSerializedDataColumns(
-                result.getDataFrame().getSerializedDataColumnsList(),
-                result.getDataFrame().getDataTimestamps());
-        handleSubscribeDataResultDoubleColumns(
-                result.getDataFrame().getDoubleColumnsList(),
-                result.getDataFrame().getDataTimestamps());
-    }
+        for (DataBucket dataBucket : result.getDataBucketsList()) {
+            final String pvName = dataBucket.getPvName();
 
-    /**
-     * Handles data from the subscribeData() response stream for the protobuf DataColumn data type. Uses
-     * ColumnTriggerUtility.checkColumnTrigger() to determine if an event for this subscription is triggered by the
-     * data columns for trigger PVs. Buffers data for target PVs so that it can be dispatched in this subscription's
-     * response stream if and when an event is triggered.
-     *
-     * @param dataColumns
-     * @param dataTimestamps
-     */
-    private void handleSubscribeDataResultDataColumns(
-            List<DataColumn> dataColumns,
-            DataTimestamps dataTimestamps
-    ) {
-        // Handle each DataColumn from result.  A PV might be treated as both a trigger and target PV.
-        for (DataColumn dataColumn : dataColumns) {
-            final String columnName = dataColumn.getName();
-
-            // handle trigger PVs immediately
-            final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(columnName);
+            // handle trigger PV buckets
+            final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(pvName);
             if (pvConditionTrigger != null) {
                 ColumnTriggerResult columnTriggerResult =
-                        ColumnTriggerUtility.checkColumnTrigger(pvConditionTrigger, dataColumn, dataTimestamps);
+                        ColumnTriggerUtility.checkColumnTrigger(pvConditionTrigger, dataBucket);
                 if (columnTriggerResult.isError()) {
                     handleError(columnTriggerResult.errorMsg());
                 }
@@ -514,130 +435,12 @@ public class EventMonitor {
                 }
             }
 
+            // handle target PV buckets
             // Buffer the data for target PVs instead of processing immediately
-            if (targetPvNames().contains(columnName)) {
-                bufferData(columnName, dataColumn, dataTimestamps);
+            if (targetPvNames().contains(pvName)) {
+                bufferManager.bufferData(pvName, dataBucket);
             }
         }
-
-    }
-
-    /**
-     * Handles data from the subscribeData() response stream for the protobuf SerializedDataColumn data type. Uses
-     * ColumnTriggerUtility.checkColumnTrigger() to determine if an event for this subscription is triggered by the
-     * data columns for trigger PVs. Buffers data for target PVs so that it can be dispatched in this subscription's
-     * response stream if and when an event is triggered.
-     *
-     * @param serializedDataColumns
-     * @param dataTimestamps
-     */
-    private void handleSubscribeDataResultSerializedDataColumns(
-            List<SerializedDataColumn> serializedDataColumns,
-            DataTimestamps dataTimestamps
-    ) {
-        // Handle each SerializedDataColumn from result.  A PV might be treated as both a trigger and target PV.
-        for (SerializedDataColumn serializedDataColumn : serializedDataColumns) {
-            final String columnName = serializedDataColumn.getName();
-
-            // handle trigger PVs immediately
-            final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(columnName);
-            if (pvConditionTrigger != null) {
-                final DataColumn dataColumn;
-                try {
-                    dataColumn = DataColumn.parseFrom(serializedDataColumn.getPayload());
-                } catch (InvalidProtocolBufferException e) {
-                    final String errorMsg = "InvalidProtocolBufferException msg: " + e.getMessage();
-                    logger.error(errorMsg + " id: " + responseObserver.hashCode());
-                    handleError(errorMsg);
-                    return;
-                }
-                ColumnTriggerResult columnTriggerResult =
-                        ColumnTriggerUtility.checkColumnTrigger(pvConditionTrigger, dataColumn, dataTimestamps);
-                if (columnTriggerResult.isError()) {
-                    handleError(columnTriggerResult.errorMsg());
-                }
-                // handle events triggered by column, list might be empty
-                for (ColumnTriggerEvent event : columnTriggerResult.columnTriggerEvents()) {
-                    handleTriggeredEvent(event.triggerTimestamp(), event.trigger(), event.dataValue());
-                }
-            }
-
-            // Buffer the data for target PVs instead of processing immediately.
-            if (targetPvNames().contains(columnName)) {
-                bufferData(columnName, serializedDataColumn, dataTimestamps);
-            }
-        }
-    }
-
-    /**
-     * Handles data from the subscribeData() response stream for the protobuf DoubleColumn data type. Uses
-     * ColumnTriggerUtility.checkColumnTrigger() to determine if an event for this subscription is triggered by the
-     * data columns for trigger PVs. Buffers data for target PVs so that it can be dispatched in this subscription's
-     * response stream if and when an event is triggered.
-     *
-     * @param doubleColumns
-     * @param dataTimestamps
-     */
-    private void handleSubscribeDataResultDoubleColumns(
-            List<DoubleColumn> doubleColumns,
-            DataTimestamps dataTimestamps
-    ) {
-        // Handle each DoubleColumn from result.  A PV might be treated as both a trigger and target PV.
-        for (DoubleColumn doubleColumn : doubleColumns) {
-            final String columnName = doubleColumn.getName();
-
-            // handle trigger PVs immediately
-            final PvConditionTrigger pvConditionTrigger = pvTriggerMap.get(columnName);
-            if (pvConditionTrigger != null) {
-                ColumnTriggerResult columnTriggerResult =
-                        ColumnTriggerUtility.checkColumnTrigger(pvConditionTrigger, doubleColumn, dataTimestamps);
-                if (columnTriggerResult.isError()) {
-                    handleError(columnTriggerResult.errorMsg());
-                }
-                // handle events triggered by column, list might be empty
-                for (ColumnTriggerEvent event : columnTriggerResult.columnTriggerEvents()) {
-                    handleTriggeredEvent(event.triggerTimestamp(), event.trigger(), event.dataValue());
-                }
-            }
-
-            // Buffer the data for target PVs instead of processing immediately
-            if (targetPvNames().contains(columnName)) {bufferData(columnName, doubleColumn, dataTimestamps);
-            }
-        }
-
-    }
-
-    /**
-     * Adds the supplied DataColumn to the DataBufferManager.
-     */
-    public void bufferData(
-            String pvName,
-            DataColumn column,
-            DataTimestamps dataTimestamps
-    ) {
-        bufferManager.bufferData(pvName, ProtobufColumnType.DATA_COLUMN, column, dataTimestamps);
-    }
-
-    /**
-     * Adds the supplied SerializedDataColumn to the DataBufferManager.
-     */
-    public void bufferData(
-            String pvName,
-            SerializedDataColumn column,
-            DataTimestamps dataTimestamps
-    ) {
-        bufferManager.bufferData(pvName, ProtobufColumnType.SERIALIZED_DATA_COLUMN, column, dataTimestamps);
-    }
-
-    /**
-     * Adds the supplied DoubleColumn to the DataBufferManager.
-     */
-    public void bufferData(
-            String pvName,
-            DoubleColumn column,
-            DataTimestamps dataTimestamps
-    ) {
-        bufferManager.bufferData(pvName, ProtobufColumnType.DOUBLE_COLUMN, column, dataTimestamps);
     }
 
     /**

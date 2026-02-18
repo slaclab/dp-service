@@ -37,7 +37,8 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
      * contains a DoubleColumn data structure.  Uses the time-series data query API to retrieve the bucket containing
      * the DataColumn sent in the ingestion request.  Confirms that the DoubleColumn retrieved via the query API matches
      * the column sent in the ingestion request, using DataColumn.equals() which compares column name and data values
-     * in the two columns.
+     * in the two columns.  Subscribes for PV data via the subscribeData() API method and confirms that the data
+     * received in the subscription response stream matches the ingested data.
      */
     @Test
     public void doubleColumnTest() {
@@ -206,9 +207,10 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             assertEquals(1, responseList.size());
             final SubscribeDataResponse subscriptionResponse = responseList.get(0);
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
-            assertTrue(subscriptionResponse.getSubscribeDataResult().hasDataFrame());
-            assertTrue(
-                    subscriptionResponse.getSubscribeDataResult().getDataFrame().getDoubleColumnsList().contains(subscriptionColumn));
+            assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
+            final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
+            assertTrue(responseBucket.hasDoubleColumn());
+            assertEquals(subscriptionColumn, responseBucket.getDoubleColumn());
         }
 
     }
