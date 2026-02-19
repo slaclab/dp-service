@@ -1,8 +1,12 @@
 package com.ospreydcs.dp.service.annotation;
 
 import ch.systemsx.cisd.hdf5.IHDF5Reader;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.annotation.*;
 import com.ospreydcs.dp.grpc.v1.common.CalculationsSpec;
+import com.ospreydcs.dp.grpc.v1.common.DataColumn;
+import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.grpc.v1.common.Timestamp;
 import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
 import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
@@ -24,6 +28,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.ospreydcs.dp.service.annotation.handler.mongo.export.DataExportHdf5File.*;
 import static org.junit.Assert.*;
 
+/**
+ * Base class for unit and integration tests covering the Annotation Service APIs.  Provides utilities for those tests,
+ * including 1) params objects for creating protobuf API requests, 2) methods for building protobuf API requests from
+ * the params, 3) observers for the API response streams, and 4) utilities for verifying the API results.
+ */
 public class AnnotationTestBase {
 
     public record AnnotationDataBlock(
@@ -620,8 +629,8 @@ public class AnnotationTestBase {
 
     public static SaveDataSetRequest buildSaveDataSetRequest(SaveDataSetParams params) {
 
-        com.ospreydcs.dp.grpc.v1.annotation.DataSet.Builder dataSetBuilder
-                = com.ospreydcs.dp.grpc.v1.annotation.DataSet.newBuilder();
+        DataSet.Builder dataSetBuilder
+                = DataSet.newBuilder();
 
         for (AnnotationDataBlock block : params.dataSet.dataBlocks) {
 
@@ -633,8 +642,8 @@ public class AnnotationTestBase {
             endTimeBuilder.setEpochSeconds(block.endSeconds);
             endTimeBuilder.setNanoseconds(block.endNanos);
 
-            com.ospreydcs.dp.grpc.v1.annotation.DataBlock.Builder dataBlockBuilder
-                    = com.ospreydcs.dp.grpc.v1.annotation.DataBlock.newBuilder();
+            DataBlock.Builder dataBlockBuilder
+                    = DataBlock.newBuilder();
             dataBlockBuilder.setBeginTime(beginTimeBuilder);
             dataBlockBuilder.setEndTime(endTimeBuilder);
             dataBlockBuilder.addAllPvNames(block.pvNames);
@@ -997,9 +1006,34 @@ public class AnnotationTestBase {
                 bucketDocument.getDataTimestamps().getSamplePeriod(),
                 reader.readLong(samplePeriodPath));
 
-        // dataColumnBytes
+        // data column content as byte array
         final String columnDataPath = pvBucketPath + PATH_SEPARATOR + DATA_COLUMN_BYTES;
-        assertArrayEquals(bucketDocument.getDataColumn().toByteArray(), reader.readAsByteArray(columnDataPath));
+        Message documentProtobufColumn = bucketDocument.getDataColumn().toProtobufColumn();
+        final byte[] fileBytes = reader.readAsByteArray(columnDataPath);
+        assertArrayEquals(documentProtobufColumn.toByteArray(), fileBytes);
+
+        // data column encoding
+        final String columnEncodingPath = pvBucketPath + PATH_SEPARATOR + DATA_COLUMN_ENCODING;
+        final String fileEncodingValue = reader.readString(columnEncodingPath);
+        assertEquals(
+                ENCODING_PROTO + ":" + documentProtobufColumn.getClass().getSimpleName(),
+                fileEncodingValue);
+
+        // test deserialization of encoded column
+        try {
+            Message fileProtobufColumn = null;
+            switch (reader.readString(columnEncodingPath)) {
+                case (ENCODING_PROTO + ":" + "DataColumn") -> {
+                    fileProtobufColumn = DataColumn.parseFrom(fileBytes);
+                }
+                case (ENCODING_PROTO + ":" + "DoubleColumn") -> {
+                    fileProtobufColumn = DoubleColumn.parseFrom(fileBytes);
+                }
+            }
+            assertEquals(documentProtobufColumn, fileProtobufColumn);
+        } catch (InvalidProtocolBufferException e) {
+            fail("error parsing protobuf column: " + e.getMessage());
+        }
 
         // dataTimestampsBytes
         final String dataTimestampsPath = pvBucketPath + PATH_SEPARATOR + DATA_TIMESTAMPS_BYTES;

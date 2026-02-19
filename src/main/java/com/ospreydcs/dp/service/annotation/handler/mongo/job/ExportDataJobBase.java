@@ -21,6 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * This is the base class for Annotation Service handler jobs to service incoming exportData() API requests.  There is
+ * a class hierarchy that corresponds to the supported export output file formats.  There are intermediate base classes
+ * for handling tabular (e.g., csv and xlsx) formats, and "bucket-oriented" (e.g., hdf5) formats, with concrete derived
+ * classes for the specific formats.
+ *
+ * The execute() method in this class is the main driver for the hierarchy, with subclasses implementing exportData_() to
+ * handle the actual export.
+ */
 public abstract class ExportDataJobBase extends HandlerJob {
 
     protected static record ExportDataStatus(boolean isError, String errorMessage) {}
@@ -54,6 +63,12 @@ public abstract class ExportDataJobBase extends HandlerJob {
             Map<String, CalculationsSpec.ColumnNameList> frameColumnNamesMap,
             String serverFilePath);
 
+    /**
+     * This is the common driver for the export job class hierarchy.  It retrieves the dataset and calculations objects
+     * specified in the request, and verifies the filtering of calculations columns.  It creates the server file, and
+     * invokes the abstract method exportData_() to export data for the dataset and collections in the request.  Results
+     * are sent in the API method response stream via the dispatcher.
+     */
     @Override
     public void execute() {
 

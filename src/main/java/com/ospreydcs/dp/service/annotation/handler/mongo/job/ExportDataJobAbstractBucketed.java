@@ -14,6 +14,14 @@ import com.ospreydcs.dp.service.query.handler.mongo.client.MongoQueryClientInter
 
 import java.util.Map;
 
+/**
+ * This is the abstract intermediate base class for bucketed data export formats (formats that handle one
+ * bucket at a time, as opposed to a tabular output format).  This class
+ * overrides the abstract method exportData_() to export the dataset and calculations specified in the request to the
+ * bucketed output driver.  Instead of defining abstract methods for subclasses, the BucketedDataExportFileInterface
+ * is used to specify the required interface for the concrete bucketed output classes.  Derived classes override
+ * createExportFile_ to initialize the instance implementing BucketedDataExportFileInterface.
+ */
 public abstract class ExportDataJobAbstractBucketed extends ExportDataJobBase {
 
     // instance variables
