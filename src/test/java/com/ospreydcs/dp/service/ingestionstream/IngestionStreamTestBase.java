@@ -17,6 +17,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.fail;
 
+/**
+ * Base class for unit and integration tests covering the Ingestion Stream Service APIs.  Provides utilities for those tests,
+ * including 1) params objects for creating protobuf API requests, 2) methods for building protobuf API requests from
+ * the params, 3) observers for the API response streams, and 4) utilities for verifying the API results.
+ */
 public class IngestionStreamTestBase {
 
     public static final class SubscribeDataEventRequestParams {

@@ -53,6 +53,11 @@ import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Annotation Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServiceWrapperBase<AnnotationServiceImpl> {
 
     // static variables
@@ -532,7 +537,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
         return resultAnnotations;
     }
 
-    protected ExportDataResponse.ExportDataResult sendExportData(
+    public ExportDataResponse.ExportDataResult sendExportData(
             ExportDataRequest request,
             boolean expectReject,
             String expectedRejectMessage

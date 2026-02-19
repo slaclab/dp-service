@@ -1,5 +1,7 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
+import com.ospreydcs.dp.grpc.v1.annotation.ExportDataRequest;
+import com.ospreydcs.dp.grpc.v1.annotation.ExportDataResponse;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
 import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
@@ -8,17 +10,23 @@ import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.SubscribeDataEventResponse;
+import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
 import com.ospreydcs.dp.service.ingest.IngestionTestBase;
 import com.ospreydcs.dp.service.ingest.utility.SubscribeDataUtility;
 import com.ospreydcs.dp.service.ingestionstream.IngestionStreamTestBase;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationTestBase;
 import com.ospreydcs.dp.service.query.QueryTestBase;
+import de.siegmar.fastcsv.reader.CsvReader;
+import de.siegmar.fastcsv.reader.CsvRecord;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 
@@ -46,7 +54,8 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
      * the column sent in the ingestion request, using DataColumn.equals() which compares column name and data values
      * in the two columns.  Subscribes for PV data via the subscribeData() API method and confirms that the data
      * received in the subscription response stream matches the ingested data.  Registers via subscribeDataEvent() for
-     * data events and confirms that the appropriate responses are received.
+     * data events and confirms that the appropriate responses are received. Creates a dataset and tests exportData()
+     * to tabular CSV output format and verifies that the output contains the expected data.
      */
     @Test
     public void doubleColumnTest() {
@@ -291,6 +300,82 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
         assertEquals(1, responseDataBuckets.size());
         assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDoubleColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
+
+        // tabular export test
+        {
+            // create a dataset for export
+            final List<AnnotationTestBase.AnnotationDataBlock> dataBlocks = new ArrayList<>();
+            final List<String> pvNames = List.of(pvName);
+            final AnnotationTestBase.AnnotationDataBlock dataBlockValid
+                    = new AnnotationTestBase.AnnotationDataBlock(
+                            firstSeconds, firstNanos, firstSeconds+1, 0, pvNames);
+            dataBlocks.add(dataBlockValid);
+            final AnnotationTestBase.AnnotationDataSet dataset =
+                    new AnnotationTestBase.AnnotationDataSet(
+                            null,
+                            "double column dataset",
+                            "ownerId",
+                            "test coverage for exporting DoubleColumn",
+                            dataBlocks);
+            final AnnotationTestBase.SaveDataSetParams datasetParams =
+                    new AnnotationTestBase.SaveDataSetParams(dataset);
+            final String datasetId =
+                    annotationServiceWrapper.sendAndVerifySaveDataSet(
+                            datasetParams, false, false, "");
+
+            // create export data request
+            final ExportDataRequest request =
+                    AnnotationTestBase.buildExportDataRequest(
+                            datasetId,
+                            null,
+                            ExportDataRequest.ExportOutputFormat.EXPORT_FORMAT_CSV);
+
+            final boolean expectReject = false;
+            final String expectedRejectMessage = "";
+            final ExportDataResponse.ExportDataResult exportResult =
+                    annotationServiceWrapper.sendExportData(request, expectReject, expectedRejectMessage);
+
+            // validate export result and output file content
+            assertNotNull(exportResult);
+            assertNotEquals("", exportResult.getFilePath());
+            // open csv file and create reader
+            final Path exportFilePath = Paths.get(exportResult.getFilePath());
+            CsvReader<CsvRecord> csvReader = null;
+            try {
+                csvReader = CsvReader.builder().ofCsvRecord(exportFilePath);
+            } catch (IOException e) {
+                fail("IOException reading csv file " + exportResult.getFilePath() + ": " + e.getMessage());
+            }
+            assertNotNull(csvReader);
+            final Iterator<CsvRecord> csvRecordIterator = csvReader.iterator();
+            final int expectedNumColumns = 3;
+            // verify header row contains pvNames
+            List<String> csvColumnHeaders;
+            {
+                assertTrue(csvRecordIterator.hasNext());
+                final CsvRecord csvRecord = csvRecordIterator.next();
+                // check number of csv header columns matches expected
+                assertEquals(expectedNumColumns, csvRecord.getFieldCount());
+                csvColumnHeaders = csvRecord.getFields();
+                // check that the csvColumnHeaders contains each of the expected PV columns
+                for (String columnName : pvNames) {
+                    assertTrue(csvColumnHeaders.contains(columnName));
+                }
+            }
+            // verify first data row
+            final CsvRecord csvRecord1 = csvRecordIterator.next();
+            assertEquals(expectedNumColumns, csvRecord1.getFieldCount());
+            final List<String> row1Values = csvRecord1.getFields();
+            assertEquals("12.34", row1Values.get(2));
+
+            // verify second data row
+            final CsvRecord csvRecord2 = csvRecordIterator.next();
+            assertEquals(expectedNumColumns, csvRecord2.getFieldCount());
+            final List<String> row2Values = csvRecord2.getFields();
+            assertEquals("34.56", row2Values.get(2));
+            assertFalse(csvRecordIterator.hasNext());
+        }
+
     }
 
 }
