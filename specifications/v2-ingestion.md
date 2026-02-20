@@ -221,12 +221,13 @@ I've now added full handling for the new DoubleColumn protobuf data type in the 
 
 6. Add integration test framework support for the new protobuf column data type (follow the pattern for DoubleColumn).
 - Add a field to IngestionTestBase.IngestionRequestParams for the list of protobuf column messages for the new data type to be added to the IngestDataRequest.
-- Modify IngestionTestBase.buildIngestionRequest() to handle adding the list of columns of the new data type to the IngestDataRequest's DataFrame.
-- Add verification logic to GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling() for the new column data type, as appropriate.
+- Modify IngestionTestBase.buildIngestionRequest() to handle adding the list of columns of the new data type to the IngestDataRequest's DataFrame (follow the example of DoubleColumn handling).
+- Add verification logic to GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling() for the new column data type, as appropriate (follow the example of DoubleColumn handling).
 
 7. Add a new integration test covering use of the new column data type in the MLDP APIs, following the pattern of DoubleColumnIT.  Note:
-- Coverage of tabular export mechanism is not necessary in new integration tests since that framework is covered pretty well (this is the last section of DoubleColumnIT)
+- Coverage of tabular export mechanism is not necessary in new integration tests since that framework is covered pretty well (this is the last section of DoubleColumnIT), so please don't include this in integration tests for other protobuf column data types.
 - Coverage of the data event subscription framework will vary for different sets of protobuf column data types.  We should add coverage for scalar / simple valued columns since they can be used as both trigger and target PVs in subscriptions.  Array / complex valued columns can only be used as target PVs, so we will need to think about how best to cover those situations, or not cover them at all. 
+- Please follow the pattern of DoubleColumnIT as closely as possible, as there was significant work in the framework to support the pattern used by the test.
 
 ## 4.1 Add Handling for the Protobuf FloatColumn Message Data Type
 
@@ -239,3 +240,7 @@ We will first complete steps 1 through 3 listed under section 4 to add Ingestion
 ### 4.1.2 Data subscripiton and data event subscription handling for FloatColumn
 
 We will next complete steps 4 and 5 listed under section "4.0 Handling for Additional Protobuf Column Messages" for adding data subscription and data event subscription handling for the new protobuf FloatColumn.  This consists of updating the SourceMonitorManager, ColumnTriggerUtility, and DataBuffer as described.
+
+### 4.1.3 Integration test coverage for FloatColumn
+
+Finally, we will complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and integration test coverage for use of FloatColumn in the MLDP APIs, respectively, as described in the details for those steps.  Regarding step 7, we SHOULD provide coverage of both data subscription and data event subscription following the example of DoubleColumnIT, since FloatColumns might be used for both trigger and target PVs in data event subscriptions.

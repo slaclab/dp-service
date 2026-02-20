@@ -69,6 +69,7 @@ public class IngestionTestBase {
         // data column lists corresponding to the protobuf column types for ingestion
         // TODO: add other new protobuf column types
         private List<DoubleColumn> doubleColumnList = null;
+        private List<FloatColumn> floatColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -166,6 +167,14 @@ public class IngestionTestBase {
             return doubleColumnList;
         }
 
+        public void setFloatColumnList(List<FloatColumn> floatColumnList) {
+            this.floatColumnList = floatColumnList;
+        }
+
+        public List<FloatColumn> floatColumnList() {
+            return floatColumnList;
+        }
+
         @Override
         public boolean equals(Object obj) {
             if (obj == this) return true;
@@ -185,12 +194,13 @@ public class IngestionTestBase {
                     Objects.equals(this.valuesStatus, that.valuesStatus) &&
                     this.useSerializedDataColumns == that.useSerializedDataColumns &&
                     Objects.equals(this.dataColumnList, that.dataColumnList) &&
-                    Objects.equals(this.doubleColumnList, that.doubleColumnList);
+                    Objects.equals(this.doubleColumnList, that.doubleColumnList) &&
+                    Objects.equals(this.floatColumnList, that.floatColumnList);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(providerId, requestId, timestampsSecondsList, timestampNanosList, samplingClockStartSeconds, samplingClockStartNanos, samplingClockPeriodNanos, samplingClockCount, columnNames, dataType, values, valuesStatus, useSerializedDataColumns, dataColumnList, doubleColumnList);
+            return Objects.hash(providerId, requestId, timestampsSecondsList, timestampNanosList, samplingClockStartSeconds, samplingClockStartNanos, samplingClockPeriodNanos, samplingClockCount, columnNames, dataType, values, valuesStatus, useSerializedDataColumns, dataColumnList, doubleColumnList, floatColumnList);
         }
 
         @Override
@@ -210,7 +220,8 @@ public class IngestionTestBase {
                     "valuesStatus=" + valuesStatus + ", " +
                     "useSerializedDataColumns=" + useSerializedDataColumns + ", " +
                     "dataColumnList=" + dataColumnList + ", " +
-                    "doubleColumnList=" + doubleColumnList + ']';
+                    "doubleColumnList=" + doubleColumnList + ", " +
+                    "floatColumnList=" + floatColumnList + ']';
         }
 
         }
@@ -384,6 +395,11 @@ public class IngestionTestBase {
         if (params.doubleColumnList() != null) {
             // use list of DoubleColumns provided by caller
             dataFrameBuilder.addAllDoubleColumns(params.doubleColumnList());
+        }
+
+        if (params.floatColumnList() != null) {
+            // use list of FloatColumns provided by caller
+            dataFrameBuilder.addAllFloatColumns(params.floatColumnList());
         }
 
         dataFrameBuilder.build();

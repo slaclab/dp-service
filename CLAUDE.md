@@ -108,15 +108,15 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 ```
 
 **Scalar Column Type Mappings:**
-| Proto Message | Java Generic Type | Document Class | BSON Discriminator |
-|--------------|------------------|----------------|-------------------|
-| DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" |
-| FloatColumn | `ScalarColumnDocumentBase<Float>` | FloatColumnDocument | "floatColumn" |
-| Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" |
-| Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" |
-| BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" |
-| StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" |
-| EnumColumn | `ScalarColumnDocumentBase<Integer>` | EnumColumnDocument | "enumColumn" |
+| Proto Message | Java Generic Type | Document Class | BSON Discriminator | Status |
+|--------------|------------------|----------------|-------------------|--------|
+| DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" | ✅ |
+| FloatColumn | `ScalarColumnDocumentBase<Float>` | FloatColumnDocument | "floatColumn" | ✅ |
+| Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" | |
+| Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" | |
+| BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | |
+| StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | |
+| EnumColumn | `ScalarColumnDocumentBase<Integer>` | EnumColumnDocument | "enumColumn" | |
 
 **Benefits of Generic Base Class:**
 - **Code Reuse**: `List<T> values` field and common methods inherited from base
@@ -293,17 +293,21 @@ The ingestion test framework has been streamlined to support systematic addition
 - **`GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`**: Enhanced verification logic for all column types
 
 **Adding New Protobuf Column Types:**
-Follow this systematic 3-step process for both implementation and testing:
+Follow this systematic 7-step process for complete implementation:
 
-**Implementation Steps:**
+**Implementation Steps (1-5):**
 1. **Create Document Class**: Implement `ScalarColumnDocumentBase<T>` with `addColumnToBucket()` method
-2. **Add Ingestion Handling**: Update ingestion pipeline to handle new column type
-3. **Query Integration**: The `addColumnToBucket()` implementation automatically enables query result API
+2. **Add Ingestion Handling**: Update `BucketDocument.generateBucketsFromRequest()` to handle new column type
+3. **Register POJO Class**: Add document class to `MongoClientBase.getPojoCodecRegistry()`
+4. **Data Subscription**: Update `SourceMonitorManager.publishDataSubscriptions()` for new column type
+5. **Event Subscription**: Update `ColumnTriggerUtility` and `DataBuffer` for trigger and size estimation support
 
-**Testing Steps:**
-1. **Add Parameter Field**: Add `List<NewColumnType>` field to `IngestionTestBase.IngestionRequestParams`
-2. **Update Request Builder**: Modify `buildIngestionRequest()` to include new columns in the `IngestDataRequest`
-3. **Add Verification Logic**: Extend `GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()` with new column type verification
+**Testing Steps (6-7):**
+6. **Test Framework Support**: 
+   - Add `List<NewColumnType>` field to `IngestionTestBase.IngestionRequestParams`
+   - Update `buildIngestionRequest()` to include new columns in `IngestDataRequest`
+   - Add verification logic to `GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`
+7. **Integration Test**: Create `<ColumnType>IT` test covering ingestion, query, subscription, and event APIs
 
 **Query API Integration:**
 New protobuf column types automatically work in query results through the `addColumnToBucket()` method:
@@ -320,18 +324,18 @@ The verification logic follows a consistent pattern for each column type:
 
 **Example Verification Flow:**
 ```java
-// For DoubleColumn verification:
+// For FloatColumn verification:
 DataColumnDocument dataColumnDocument = bucketDocument.getDataColumnDocument();
-DoubleColumn storedColumn = (DoubleColumn) dataColumnDocument.toProtobufColumn();
-// Find matching column from request.getDoubleColumnsList()
+FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
+// Find matching column from request.getFloatColumnsList()
 // Verify storedColumn matches original request data
 ```
 
 **Benefits:**
-- **Systematic**: Same 3-step pattern for every new column type
-- **Comprehensive**: Tests full ingestion pipeline from request → storage → retrieval
+- **Systematic**: Same 7-step pattern for every new column type
+- **Comprehensive**: Tests full pipeline from ingestion → storage → query → subscription → events
 - **Maintainable**: Centralized verification logic in wrapper class
-- **Extensible**: Easy to add new column types without modifying existing test infrastructure
+- **Extensible**: Easy to add new column types without modifying existing infrastructure
 
 ### Ingestion Validation Test Coverage
 - **Test Location**: `IngestionValidationUtilityTest` (22 test cases)
@@ -351,7 +355,7 @@ DoubleColumn storedColumn = (DoubleColumn) dataColumnDocument.toProtobufColumn()
 ### Scalar Column Document Test Coverage  
 - **Unit Tests**: `ScalarColumnDocumentBaseTest` - Basic functionality of generic base class
 - **Protobuf Conversion Tests**: `ScalarColumnDocumentBaseProtobufTest` (7 test cases)
-- **Integration Tests**: `integration/v2api/DoubleColumnIT` - End-to-end DoubleColumn pipeline (ingestion, query, subscription)
+- **Integration Tests**: `integration/v2api/DoubleColumnIT`, `integration/v2api/FloatColumnIT` - End-to-end column pipelines (ingestion, query, subscription)
 
 **ScalarColumnDocumentBaseProtobufTest Coverage:**
 - **Core Functionality**: Document → protobuf conversion via `toProtobufColumn()`
