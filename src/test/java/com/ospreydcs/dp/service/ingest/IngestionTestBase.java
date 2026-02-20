@@ -70,6 +70,7 @@ public class IngestionTestBase {
         // TODO: add other new protobuf column types
         private List<DoubleColumn> doubleColumnList = null;
         private List<FloatColumn> floatColumnList = null;
+        private List<Int64Column> int64ColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -169,6 +170,14 @@ public class IngestionTestBase {
 
         public void setFloatColumnList(List<FloatColumn> floatColumnList) {
             this.floatColumnList = floatColumnList;
+        }
+
+        public List<Int64Column> int64ColumnList() {
+            return int64ColumnList;
+        }
+
+        public void setInt64ColumnList(List<Int64Column> int64ColumnList) {
+            this.int64ColumnList = int64ColumnList;
         }
 
         public List<FloatColumn> floatColumnList() {
@@ -400,6 +409,11 @@ public class IngestionTestBase {
         if (params.floatColumnList() != null) {
             // use list of FloatColumns provided by caller
             dataFrameBuilder.addAllFloatColumns(params.floatColumnList());
+        }
+
+        if (params.int64ColumnList() != null) {
+            // use list of Int64Columns provided by caller
+            dataFrameBuilder.addAllInt64Columns(params.int64ColumnList());
         }
 
         dataFrameBuilder.build();
