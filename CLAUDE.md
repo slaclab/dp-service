@@ -112,7 +112,7 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 |--------------|------------------|----------------|-------------------|--------|
 | DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" | ✅ |
 | FloatColumn | `ScalarColumnDocumentBase<Float>` | FloatColumnDocument | "floatColumn" | ✅ |
-| Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" | |
+| Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" | ✅ |
 | Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" | |
 | BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | |
 | StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | |
@@ -355,7 +355,7 @@ FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
 ### Scalar Column Document Test Coverage  
 - **Unit Tests**: `ScalarColumnDocumentBaseTest` - Basic functionality of generic base class
 - **Protobuf Conversion Tests**: `ScalarColumnDocumentBaseProtobufTest` (7 test cases)
-- **Integration Tests**: `integration/v2api/DoubleColumnIT`, `integration/v2api/FloatColumnIT` - End-to-end column pipelines (ingestion, query, subscription)
+- **Integration Tests**: `integration/v2api/DoubleColumnIT`, `integration/v2api/FloatColumnIT`, `integration/v2api/Int64ColumnIT` - End-to-end column pipelines (ingestion, query, subscription)
 
 **ScalarColumnDocumentBaseProtobufTest Coverage:**
 - **Core Functionality**: Document → protobuf conversion via `toProtobufColumn()`

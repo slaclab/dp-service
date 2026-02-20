@@ -213,6 +213,26 @@ public class SourceMonitorManager {
             }
         }
 
+        // publish Int32Columns in request that have subscribers
+        for (Int32Column requestColumn : request.getIngestionDataFrame().getInt32ColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setInt32Column(requestColumn)
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
     }
 
     private List<SourceMonitor> getSubscribersForPv(String pvName) {

@@ -307,6 +307,9 @@ public class DataBuffer {
                 size.addAndGet(int64Column.getValuesCount() * 8); // 8 bytes per long
             }
             case INT32COLUMN -> {
+                final Int32Column int32Column = dataBucket.getInt32Column();
+                size.addAndGet(int32Column.getName().length() * 2);
+                size.addAndGet(int32Column.getValuesCount() * 4); // 4 bytes per int
             }
             case BOOLCOLUMN -> {
             }
