@@ -170,7 +170,7 @@ For the array data types (DoubleArrayColumn, FloatArrayColumn, Int32ArrayColumn,
 
 Please add comprehensive test coverage for all failure scenarios and new proto column message data structures.
 
-## 2.0 Ingestion Performance Benchmark
+### 2.0 Ingestion Performance Benchmark
 
 I've added a framework to the Ingestion Service handler that reflects the new column-oriented data structures in the gRPC ingestion API in writing BucketDocuments to MongoDB for each column contained in an IngestDataRequest's IngestionDataFrame.  The BucketDocuments now include an embedded document with the sample data values for the corresponding request column.  There is a Java POJO class hierarchy for the embedded column documents, ColumnDocumentBase, with a derived class DoubleColumnDocument to serve as the embedded column document when creating a BucketDocument for a protobuf DoubleColumn message.  I also refactored the existing code to make the previously existing DataColumnDocument extend ColumnDocumentBase.  A BucketDocument containing a DataColumnDocument is created when the ingestion request data frame includes a DataColumn protobuf message.  I will add classes to the ColumnDocumentBase hierarchy to support the other protobuf column messages as a follow on task.
 
@@ -194,8 +194,44 @@ I agree with your recommendation in option 1 to use the strategy pattern and fac
 6. Update benchmark main() methods to parse column type from args
 7. Add new DoubleColumnBuilder implementation:
 
-## 3.0 Parameterized Intermediate Base Class for Scalar Columns
+### 3.0 Parameterized Intermediate Base Class for Scalar Columns
 
 Please design a generic intermediate base class extending ColumnDocumentBase, "ScalarColumnDocumentBase", with a parameter for the scalar object type contained by the column.  For example, we will change the new DoubleColumnDocument to extend ScalarColumnBase and the type parameter will be "Double".  Move the "values" instance variable up from DoubleColumnDocument to the new base class and make the List of values use the parameter type as the List type.  Consider moving other methods up to the base class if their implementation is generic, or could be generic.  Don't change any code yet, just propose a design and please feel free to make suggestions for improvement to the approach.
 
 The relevant proto column data structure messages are DoubleColumn, FloatColumn, Int64Column, Int32Column, BoolColumn, StringColumn, and EnumColumn.
+
+### 4.0 Handling for Additional Protobuf Column Messages
+
+I've now added full handling for the new DoubleColumn protobuf data type in the MLDP service implementations, and I think I have a handle on what needs to be done for adding handling for additional column data types. Here are the tasks for adding handling for a new protobuf column data type:
+
+1. Add BSON POJO class that extends ColumnDocumentBase for the protobuf column data type (like DoubleColumnDocument)
+- add discriminator e.g., @BsonDiscriminator(key = "_t", value = "doubleColumn")
+- add instance variables for field values with accessor methods
+- add static method like DoubleColumnDocument.fromDoubleColumn(DoubleColumn) that returns a new instance of the document class (as ColumnDocumentBase)
+- add method like DoubleColumnDocument.toDoubleColumn() that creates the protobuf data type from the BSON document instance
+- implment required abstract methods including 1) addColumnToBucket() to add the appropriate protobuf message to the supplied DataBucket.Builder; 2) toDataColumn() to create and return a protobuf DataColumn that contains DataValues appropriate for the document class (this is used for tabular query and export etc, and some classes may need to throw an exception if they aren't compatible with DataColumn / DataValue); 3) toByteArray() for hdf5 export etc.
+
+2. Modify BucketDocument.generateBucketsFromRequest() to handle the new column data type from the IngestDataRequest (following the pattern of handling for DoubleColumn).
+
+3. Modify MongoClientBase.getPojoCodecRegistry() to add an entry for the new BSON document class.
+
+4. Add handling to the data subscription framework by adding handling for the new protobuf column data type to SourceMonitorManager.publishDataSubscriptions().
+
+5. Add handling to the data event subscription framework by adding a variant for the protobuf column data type of ColumnTriggerUtility.checkColumnTrigger(), and add a case to DataBuffer.estimateDataSize().
+
+6. Add integration test framework support for the new protobuf column data type (follow the pattern for DoubleColumn).
+- Add a field to IngestionTestBase.IngestionRequestParams for the list of protobuf column messages for the new data type to be added to the IngestDataRequest.
+- Modify IngestionTestBase.buildIngestionRequest() to handle adding the list of columns of the new data type to the IngestDataRequest's DataFrame.
+- Add verification logic to GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling() for the new column data type, as appropriate.
+
+7. Add a new integration test covering use of the new column data type in the MLDP APIs, following the pattern of DoubleColumnIT.  Note:
+- Coverage of tabular export mechanism is not necessary in new integration tests since that framework is covered pretty well (this is the last section of DoubleColumnIT)
+- Coverage of the data event subscription framework will vary for different sets of protobuf column data types.  We should add coverage for scalar / simple valued columns since they can be used as both trigger and target PVs in subscriptions.  Array / complex valued columns can only be used as target PVs, so we will need to think about how best to cover those situations, or not cover them at all. 
+
+## 4.1 Add Handling for the Protobuf FloatColumn Message Data Type
+
+The steps for adding handling for a new protobuf column data type to the MLDP services are enumerated above, under section 4.0 of this document.  We are going to add handling for the protobuf FloatColumn data type (defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto).  Since this is the first attempt at adding handling for a new column data type, let's complete the work in steps.  The steps are defined in the following subsections.
+
+### 4.1.1 Add ingestion framework support for FloatColumn
+
+We will first complete steps 1 through 3 listed under section 4 to add Ingestion Service support for handling protobuf FloatColumn data.  This includes creating the BSON POJO class, including the column data type in generating BucketDocuments for the request, and modifying the POJO codec registry to add the new class.
