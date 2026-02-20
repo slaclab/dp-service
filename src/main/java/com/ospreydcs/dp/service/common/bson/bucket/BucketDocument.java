@@ -9,6 +9,7 @@ import com.ospreydcs.dp.service.common.bson.DataTimestampsDocument;
 import com.ospreydcs.dp.service.common.bson.DpBsonDocumentBase;
 import com.ospreydcs.dp.service.common.bson.column.DoubleColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.FloatColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.Int64ColumnDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.ingest.model.DpIngestionException;
 
@@ -153,6 +154,12 @@ public class BucketDocument extends DpBsonDocumentBase {
         // create BucketDocument for each FloatColumn
         for (FloatColumn column : request.getIngestionDataFrame().getFloatColumnsList()) {
             ColumnDocumentBase columnDocument = FloatColumnDocument.fromFloatColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each Int64Column
+        for (Int64Column column : request.getIngestionDataFrame().getInt64ColumnsList()) {
+            ColumnDocumentBase columnDocument = Int64ColumnDocument.fromInt64Column(column);
             bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 

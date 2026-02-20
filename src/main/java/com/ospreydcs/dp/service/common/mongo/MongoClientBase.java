@@ -4,10 +4,7 @@ import com.mongodb.client.model.Indexes;
 import com.ospreydcs.dp.service.common.bson.annotation.AnnotationDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
-import com.ospreydcs.dp.service.common.bson.column.ColumnDocumentBase;
-import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.DoubleColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.FloatColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.*;
@@ -101,7 +98,8 @@ public abstract class MongoClientBase {
                 ColumnDocumentBase.class,
                 DataColumnDocument.class,
                 DoubleColumnDocument.class,
-                FloatColumnDocument.class
+                FloatColumnDocument.class,
+                Int64ColumnDocument.class
         ).build();
 
         //        CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();

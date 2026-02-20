@@ -244,3 +244,7 @@ We will next complete steps 4 and 5 listed under section "4.0 Handling for Addit
 ### 4.1.3 Integration test coverage for FloatColumn
 
 Finally, we will complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and integration test coverage for use of FloatColumn in the MLDP APIs, respectively, as described in the details for those steps.  Regarding step 7, we SHOULD provide coverage of both data subscription and data event subscription following the example of DoubleColumnIT, since FloatColumns might be used for both trigger and target PVs in data event subscriptions.
+
+### 4.2.1 Add handling for the protobuf Int64Column message data type
+
+Next, we will add MLDP handling for the Int64Column message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".

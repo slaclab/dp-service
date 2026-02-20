@@ -302,6 +302,9 @@ public class DataBuffer {
                 size.addAndGet(floatColumn.getValuesCount() * 4); // number of list elements * primitive size
             }
             case INT64COLUMN -> {
+                final Int64Column int64Column = dataBucket.getInt64Column();
+                size.addAndGet(int64Column.getName().length() * 2);
+                size.addAndGet(int64Column.getValuesCount() * 8); // 8 bytes per long
             }
             case INT32COLUMN -> {
             }
