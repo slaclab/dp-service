@@ -297,6 +297,9 @@ public class DataBuffer {
                 size.addAndGet(doubleColumn.getValuesCount() * 8); // number of list elements * primitive size
             }
             case FLOATCOLUMN -> {
+                final FloatColumn floatColumn = dataBucket.getFloatColumn();
+                size.addAndGet(floatColumn.getName().length() * 2);
+                size.addAndGet(floatColumn.getValuesCount() * 4); // number of list elements * primitive size
             }
             case INT64COLUMN -> {
             }

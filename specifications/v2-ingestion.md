@@ -217,7 +217,7 @@ I've now added full handling for the new DoubleColumn protobuf data type in the 
 
 4. Add handling to the data subscription framework by adding handling for the new protobuf column data type to SourceMonitorManager.publishDataSubscriptions().
 
-5. Add handling to the data event subscription framework by adding a variant for the protobuf column data type of ColumnTriggerUtility.checkColumnTrigger(), and add a case to DataBuffer.estimateDataSize().
+5. Add handling to the data event subscription framework by 1) updating the main ColumnTriggerUtility.checkColumnTrigger(PvConditionTrigger, DataBucket) variant to handle the DataBucket.dataCase switch statement to handle the new column data type by dispatching to a new checkColumnTrigger() variant for handling the new column data type; 2) adding the new ColumnTriggerUtility.checkColumnTrigger() variant for the new protobuf column data type; and 3) adding a case to DataBuffer.estimateDataSize() for the new protobuf column data type.
 
 6. Add integration test framework support for the new protobuf column data type (follow the pattern for DoubleColumn).
 - Add a field to IngestionTestBase.IngestionRequestParams for the list of protobuf column messages for the new data type to be added to the IngestDataRequest.
@@ -235,3 +235,7 @@ The steps for adding handling for a new protobuf column data type to the MLDP se
 ### 4.1.1 Add ingestion framework support for FloatColumn
 
 We will first complete steps 1 through 3 listed under section 4 to add Ingestion Service support for handling protobuf FloatColumn data.  This includes creating the BSON POJO class, including the column data type in generating BucketDocuments for the request, and modifying the POJO codec registry to add the new class.
+
+### 4.1.2 Data subscripiton and data event subscription handling for FloatColumn
+
+We will next complete steps 4 and 5 listed under section "4.0 Handling for Additional Protobuf Column Messages" for adding data subscription and data event subscription handling for the new protobuf FloatColumn.  This consists of updating the SourceMonitorManager, ColumnTriggerUtility, and DataBuffer as described.

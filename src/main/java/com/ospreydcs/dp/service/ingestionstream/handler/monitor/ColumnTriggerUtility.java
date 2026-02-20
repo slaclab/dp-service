@@ -102,6 +102,7 @@ public class ColumnTriggerUtility {
                 return checkColumnTrigger(trigger, dataBucket.getDoubleColumn(), dataBucket.getDataTimestamps());
             }
             case FLOATCOLUMN -> {
+                return checkColumnTrigger(trigger, dataBucket.getFloatColumn(), dataBucket.getDataTimestamps());
             }
             case INT64COLUMN -> {
             }
@@ -314,6 +315,69 @@ public class ColumnTriggerUtility {
                 // Add details for triggered event to result.
                 DataValue doubleDataValue = DataValue.newBuilder().setDoubleValue(doubleValue).build();
                 columnTriggerEvents.add(new ColumnTriggerEvent(triggerTimestamp, trigger, doubleDataValue));
+            }
+
+            columnValueIndex = columnValueIndex + 1;
+        }
+
+        return new ColumnTriggerResult(false, "", columnTriggerEvents);
+    }
+
+    /**
+     * Check if the condition for the specified PvConditionTrigger is triggered by data in the FloatColumn.
+     *
+     * @param trigger
+     * @param column
+     * @param dataTimestamps
+     * @return
+     */
+    private static ColumnTriggerResult checkColumnTrigger(
+            PvConditionTrigger trigger,
+            FloatColumn column,
+            DataTimestamps dataTimestamps
+    ) {
+        final String columnPvName = column.getName();
+        final PvConditionTrigger.PvCondition triggerCondition = trigger.getCondition();
+        final DataValue triggerValue = trigger.getValue();
+
+        if (triggerValue.getValueCase() != DataValue.ValueCase.FLOATVALUE) {
+            final String errorMsg = "PvConditionTrigger type mismatch PV name: " + columnPvName
+                    + " trigger value data type expected float: " + triggerValue.getValueCase().name();
+            return new ColumnTriggerResult(true, errorMsg, null);
+        }
+
+        // check if each column data value triggers the event
+        int columnValueIndex = 0;
+        List<ColumnTriggerEvent> columnTriggerEvents = new ArrayList<>();
+        for (float floatValue : column.getValuesList()) {
+
+            final float typedTriggerValue = triggerValue.getFloatValue();
+            ValueTriggerResult valueTriggerResult = checkValueTrigger(floatValue, typedTriggerValue, triggerCondition);
+
+            boolean isError = false;
+            boolean isTriggered = false;
+            if (valueTriggerResult != null) {
+                isTriggered = valueTriggerResult.isTriggered();
+                isError = valueTriggerResult.isError();
+                if (isError) {
+                    final String errorMsg = "PvConditionTrigger error comparing data value for PV name: "
+                            + columnPvName
+                            + " msg: " + valueTriggerResult.errorMsg();
+                    return new ColumnTriggerResult(true, errorMsg, null);
+                }
+            }
+
+            if (isTriggered) {
+                final Timestamp triggerTimestamp =
+                        DataTimestampsUtility.timestampForIndex(dataTimestamps, columnValueIndex);
+                if (triggerTimestamp == null) {
+                    final String errorMsg = "PvConditionTrigger error getting timestamp for PV: " + columnPvName;
+                    return new ColumnTriggerResult(true, errorMsg, null);
+                }
+
+                // Add details for triggered event to result.
+                DataValue floatDataValue = DataValue.newBuilder().setFloatValue(floatValue).build();
+                columnTriggerEvents.add(new ColumnTriggerEvent(triggerTimestamp, trigger, floatDataValue));
             }
 
             columnValueIndex = columnValueIndex + 1;
