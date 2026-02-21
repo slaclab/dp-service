@@ -278,3 +278,22 @@ Let's discuss whether it makes sense to treat this as a scalar column (by extend
 ### 4.5.2 Add integration test coverage for StringColumn
 
 Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf StringColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build StringColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription. 
+
+### 4.6.1 Add handling for the protobuf EnumColumn message data type
+
+Next, we will add MLDP handling for the EnumColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".  We will add test coverage as a folow up task.
+
+This one is another special case, but it also seems like it should extend ScalarColumnDocument because it uses packed int32 values.  But one difference to the other scalar columns is that there is an additional parameter for the enumId String.  Since ScalarColumnDocumentBase is parameterized, how is this going to work for EnumColumn?  Let's discuss before we decide on the approach.
+
+### 4.6.2 Add integration test coverage for EnumColumn
+
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf EnumColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build EnumColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription.
+
+### 5.0 handling for non-scalar protobuf column data types
+
+The remaining protobuf column data types are for handling non-scalar data values, so there are some slight changes to the tasks for adding handling for these column types.
+
+The first difference is that the BSON POJO document class will extend ColumnDocumentBase instead of ScalarColumnDocumentBase (or some intermediate base class that we think we should add).
+
+The second difference is that none of these column data types will be 
+

@@ -324,6 +324,10 @@ public class DataBuffer {
                 }
             }
             case ENUMCOLUMN -> {
+                final EnumColumn enumColumn = dataBucket.getEnumColumn();
+                size.addAndGet(enumColumn.getName().length() * 2);
+                size.addAndGet(enumColumn.getEnumId().length() * 2);
+                size.addAndGet(enumColumn.getValuesCount() * 4); // 4 bytes per int32
             }
             case IMAGECOLUMN -> {
             }
