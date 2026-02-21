@@ -74,6 +74,7 @@ public class IngestionTestBase {
         private List<Int32Column> int32ColumnList = null;
         private List<BoolColumn> boolColumnList = null;
         private List<StringColumn> stringColumnList = null;
+        private List<EnumColumn> enumColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -205,6 +206,14 @@ public class IngestionTestBase {
 
         public void setStringColumnList(List<StringColumn> stringColumnList) {
             this.stringColumnList = stringColumnList;
+        }
+
+        public List<EnumColumn> enumColumnList() {
+            return enumColumnList;
+        }
+
+        public void setEnumColumnList(List<EnumColumn> enumColumnList) {
+            this.enumColumnList = enumColumnList;
         }
 
         public List<FloatColumn> floatColumnList() {
@@ -455,6 +464,10 @@ public class IngestionTestBase {
         if (params.stringColumnList() != null) {
             // use list of StringColumns provided by caller
             dataFrameBuilder.addAllStringColumns(params.stringColumnList());
+        }
+        if (params.enumColumnList() != null) {
+            // use list of EnumColumns provided by caller
+            dataFrameBuilder.addAllEnumColumns(params.enumColumnList());
         }
 
         dataFrameBuilder.build();
