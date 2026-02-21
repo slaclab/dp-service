@@ -312,6 +312,9 @@ public class DataBuffer {
                 size.addAndGet(int32Column.getValuesCount() * 4); // 4 bytes per int
             }
             case BOOLCOLUMN -> {
+                final BoolColumn boolColumn = dataBucket.getBoolColumn();
+                size.addAndGet(boolColumn.getName().length() * 2);
+                size.addAndGet(boolColumn.getValuesCount() * 1); // 1 byte per boolean
             }
             case STRINGCOLUMN -> {
             }

@@ -260,3 +260,11 @@ Next, we will add MLDP handling for the Int32Column message defined in ~/dp.fork
 ### 4.3.2 Add integration test coverage for Int32Column
 
 Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf Int32Column.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build Int64Columns instead of DoubleColumns, and of course using long data values instead of doubles.  Pretty much everything else could stay the same.  Please skip the coverage of tabular data export at the end of the test, but include everything else including data subscription and data event subscription.
+
+### 4.4.1 Add handling for the protobuf BoolColumn message data type
+
+Next, we will add MLDP handling for the BoolColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".  We will add test coverage as a folow up task.
+
+### 4.4.2 Add integration test coverage for BoolColumn
+
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf BoolColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build BoolColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Pretty much everything else could stay the same.  Please skip the coverage of tabular data export at the end of the test, but include everything else including data subscription and data event subscription.
