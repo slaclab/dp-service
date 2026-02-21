@@ -114,6 +114,7 @@ public class ColumnTriggerUtility {
                 return checkColumnTrigger(trigger, dataBucket.getBoolColumn(), dataBucket.getDataTimestamps());
             }
             case STRINGCOLUMN -> {
+                return checkColumnTrigger(trigger, dataBucket.getStringColumn(), dataBucket.getDataTimestamps());
             }
             case ENUMCOLUMN -> {
             }
@@ -570,6 +571,69 @@ public class ColumnTriggerUtility {
                 // Add details for triggered event to result.
                 DataValue boolDataValue = DataValue.newBuilder().setBooleanValue(boolValue).build();
                 columnTriggerEvents.add(new ColumnTriggerEvent(triggerTimestamp, trigger, boolDataValue));
+            }
+
+            columnValueIndex = columnValueIndex + 1;
+        }
+
+        return new ColumnTriggerResult(false, "", columnTriggerEvents);
+    }
+
+    /**
+     * Check if the condition for the specified PvConditionTrigger is triggered by data in the StringColumn.
+     *
+     * @param trigger
+     * @param column
+     * @param dataTimestamps
+     * @return
+     */
+    private static ColumnTriggerResult checkColumnTrigger(
+            PvConditionTrigger trigger,
+            StringColumn column,
+            DataTimestamps dataTimestamps
+    ) {
+        final String columnPvName = column.getName();
+        final PvConditionTrigger.PvCondition triggerCondition = trigger.getCondition();
+        final DataValue triggerValue = trigger.getValue();
+        final String typedTriggerValue = triggerValue.getStringValue();
+
+        if (triggerValue.getValueCase() != DataValue.ValueCase.STRINGVALUE) {
+            final String errorMsg = "PvConditionTrigger type mismatch PV name: " + columnPvName
+                    + " trigger value data type expected string: " + triggerValue.getValueCase().name();
+            return new ColumnTriggerResult(true, errorMsg, null);
+        }
+
+        // check if each column data value triggers the event
+        int columnValueIndex = 0;
+        List<ColumnTriggerEvent> columnTriggerEvents = new ArrayList<>();
+        for (String stringValue : column.getValuesList()) {
+
+            ValueTriggerResult valueTriggerResult = checkValueTrigger(stringValue, typedTriggerValue, triggerCondition);
+
+            boolean isError = false;
+            boolean isTriggered = false;
+            if (valueTriggerResult != null) {
+                isTriggered = valueTriggerResult.isTriggered();
+                isError = valueTriggerResult.isError();
+                if (isError) {
+                    final String errorMsg = "PvConditionTrigger error comparing data value for PV name: "
+                            + columnPvName
+                            + " msg: " + valueTriggerResult.errorMsg();
+                    return new ColumnTriggerResult(true, errorMsg, null);
+                }
+            }
+
+            if (isTriggered) {
+                final Timestamp triggerTimestamp =
+                        DataTimestampsUtility.timestampForIndex(dataTimestamps, columnValueIndex);
+                if (triggerTimestamp == null) {
+                    final String errorMsg = "PvConditionTrigger error getting timestamp for PV: " + columnPvName;
+                    return new ColumnTriggerResult(true, errorMsg, null);
+                }
+
+                // Add details for triggered event to result.
+                DataValue stringDataValue = DataValue.newBuilder().setStringValue(stringValue).build();
+                columnTriggerEvents.add(new ColumnTriggerEvent(triggerTimestamp, trigger, stringDataValue));
             }
 
             columnValueIndex = columnValueIndex + 1;

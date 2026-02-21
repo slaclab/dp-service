@@ -317,6 +317,11 @@ public class DataBuffer {
                 size.addAndGet(boolColumn.getValuesCount() * 1); // 1 byte per boolean
             }
             case STRINGCOLUMN -> {
+                final StringColumn stringColumn = dataBucket.getStringColumn();
+                size.addAndGet(stringColumn.getName().length() * 2);
+                for (String value : stringColumn.getValuesList()) {
+                    size.addAndGet(value.length() * 2); // 2 bytes per character (UTF-16)
+                }
             }
             case ENUMCOLUMN -> {
             }

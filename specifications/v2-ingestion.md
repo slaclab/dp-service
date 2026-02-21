@@ -268,3 +268,16 @@ Next, we will add MLDP handling for the BoolColumn message defined in ~/dp.fork/
 ### 4.4.2 Add integration test coverage for BoolColumn
 
 Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf BoolColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build BoolColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Pretty much everything else could stay the same.  Please skip the coverage of tabular data export at the end of the test, but include everything else including data subscription and data event subscription.
+
+### 4.5.1 Add handling for the protobuf StringColumn message data type
+
+Next, we will add MLDP handling for the StringColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".  We will add test coverage as a folow up task.
+
+Let's discuss whether it makes sense to treat this as a scalar column (by extending ScalarColumnDocumentBase), or if it is somehow different.  One difference at the MongoDB level is that we want to index the individual data values for the other scalar column data types, but probably not for StringColumn data.
+
+### 4.5.2 Add integration test coverage for StringColumn
+
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf StringColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build StringColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription.  
+
+We need to discuss the approach for covering data event subscription.  StringColumn is different from the other scalar column data types in that I don't think we want to use it as a trigger PV, only as a target PV.  That means the test would need to use a PV of a different scalar data type as the trigger, we would ingest data for both the scalar PV and string PV, and then verify we receive the expected StringColumn target PV data.
+
