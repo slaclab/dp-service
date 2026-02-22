@@ -140,13 +140,85 @@ EnumColumn uses a hybrid approach that extends the scalar pattern with additiona
 - `toProtobufColumn()` - Template method for creating typed protobuf column
 - `addColumnToBucket()` - Abstract method implementation for query result API integration
 
+### Binary Column Document Class Hierarchy
+
+The ingestion service uses a two-level hierarchy for binary data columns that require specialized storage handling:
+
+**Base Classes:**
+- **`BinaryColumnDocumentBase`**: Abstract base for columns storing binary data (arrays, images, structs)
+- **`ArrayColumnDocumentBase`**: Specialized base for array column types with dimensional metadata
+
+**Storage Abstraction:**
+```java
+public class StorageDocument {
+    public enum StorageKind { INLINE, GRIDFS }
+    private StorageKind kind;
+    private byte[] data;        // Used when kind = INLINE
+    private ObjectId fileId;    // Used when kind = GRIDFS
+    private Long sizeBytes;     // Size tracking for both storage types
+}
+```
+
+**Array Column Implementation Pattern:**
+```java
+@BsonDiscriminator(key = "_t", value = "arrayType")
+public class TypeArrayColumnDocument extends ArrayColumnDocumentBase {
+    
+    @Override
+    protected int getElementSizeBytes() {
+        return ELEMENT_SIZE; // e.g., 8 for double, 4 for float
+    }
+    
+    @Override
+    protected void writeValuesToBuffer(ByteBuffer buffer, Object values, int totalElements) {
+        // Type-specific binary serialization with little-endian order
+    }
+    
+    @Override
+    protected Message deserializeToProtobufColumn() throws DpException {
+        // Type-specific binary deserialization to protobuf column
+    }
+}
+```
+
+**Array Column Type Mappings:**
+| Proto Message | Element Size | Document Class | BSON Discriminator | Status |
+|--------------|--------------|----------------|-------------------|--------|
+| DoubleArrayColumn | 8 bytes | DoubleArrayColumnDocument | "doubleArrayColumn" | ✅ |
+| FloatArrayColumn | 4 bytes | FloatArrayColumnDocument | "floatArrayColumn" | |
+| Int64ArrayColumn | 8 bytes | Int64ArrayColumnDocument | "int64ArrayColumn" | |
+| Int32ArrayColumn | 4 bytes | Int32ArrayColumnDocument | "int32ArrayColumn" | |
+| BoolArrayColumn | 1 byte | BoolArrayColumnDocument | "boolArrayColumn" | |
+
+**Binary Storage Features:**
+- **Little-Endian Serialization**: Optimized ByteBuffer serialization with `ByteOrder.LITTLE_ENDIAN`
+- **Row-Major Flattening**: Multi-dimensional arrays stored as `sample_count × product(dimensions)` elements
+- **Storage Flexibility**: Inline storage for small data, GridFS ready for large arrays (>16MB)
+- **Memory Efficiency**: Binary storage avoids per-element BSON overhead for array data
+- **No Trigger Support**: Array columns can only be targets in data event subscriptions, not triggers
+
+**Benefits of Two-Level Hierarchy:**
+- **Code Reuse**: BinaryColumnDocumentBase shared by array, image, struct, and serialized columns
+- **Type Safety**: ArrayColumnDocumentBase provides array-specific validation and serialization
+- **Extensibility**: Easy to add new binary column types (ImageColumn, StructColumn)
+- **Performance**: Binary serialization optimized for high-frequency array ingestion scenarios
+
 ## Export Framework Architecture
-The Annotation Service includes a sophisticated export framework:
+The Annotation Service includes a sophisticated export framework with format-specific support for different column types:
 - **Base Classes**: `ExportDataJobBase` → `ExportDataJobAbstractTabular` → format-specific jobs
 - **Format Jobs**: `ExportDataJobCsv`, `ExportDataJobExcel`, `ExportDataJobHdf5`
 - **File Interfaces**: `TabularDataExportFileInterface` implemented by `DataExportXlsxFile`, etc.
 - **Data Processing**: `TimestampDataMap` for tabular data assembly, `TabularDataUtility` for data manipulation
 - **Excel Implementation**: Uses Apache POI with `XSSFWorkbook` for reliable XLSX generation
+
+### Export Format Compatibility by Column Type
+- **Scalar Columns** (DoubleColumn, StringColumn, etc.): Support all export formats (CSV, Excel, HDF5)
+  - **Tabular Formats**: CSV and Excel export via `toDataColumn()` conversion to sample-oriented format
+  - **HDF5**: Native support for efficient columnar storage of scalar time-series data
+- **Binary Array Columns** (DoubleArrayColumn, etc.): **HDF5 export only**
+  - **HDF5**: Optimal format for multi-dimensional array data with native array storage
+  - **Tabular Limitation**: Cannot export to CSV/Excel as binary columns cannot convert to legacy DataColumn format
+  - **Future Enhancement**: Array columns require specialized tabular export implementation for flattened element columns
 
 ### Excel File Generation
 The `DataExportXlsxFile` class uses `XSSFWorkbook` (non-streaming) for better reliability:
@@ -355,10 +427,16 @@ FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
 
 ### V2 API Integration Test Coverage
 - **Test Location**: `src/test/java/com/ospreydcs/dp/service/integration/v2api/`
-- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`)
+- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`)
 - **Comprehensive Coverage**: Each test class covers ingestion, query, and subscription APIs for one column type
 - **Query API Integration**: Tests verify `addColumnToBucket()` method implementation for query result assembly
 - **Framework Pattern**: Same integration test structure applies to scalar and complex column types
+
+#### Array Column Test Patterns
+- **Dual PV Approach**: Array integration tests use scalar columns as triggers and array columns as targets
+- **Event Subscriptions**: Array columns cannot serve as trigger PVs, requiring scalar trigger + array target pattern
+- **PV Validation**: Both scalar and array PVs included in initial ingestion for proper subscription validation
+- **Export Testing**: Array columns skip tabular export tests due to binary storage limitations
 
 ### Scalar Column Document Test Coverage  
 - **Unit Tests**: `ScalarColumnDocumentBaseTest` - Basic functionality of generic base class
