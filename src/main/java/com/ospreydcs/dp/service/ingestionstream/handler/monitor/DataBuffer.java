@@ -334,6 +334,15 @@ public class DataBuffer {
             case STRUCTCOLUMN -> {
             }
             case DOUBLEARRAYCOLUMN -> {
+                final DoubleArrayColumn doubleArrayColumn = dataBucket.getDoubleArrayColumn();
+                size.addAndGet(doubleArrayColumn.getName().length() * 2);
+                // Calculate array size: elements per sample × samples × 8 bytes per double
+                int elementCount = 1;
+                for (int dim : doubleArrayColumn.getDimensions().getDimsList()) {
+                    elementCount *= dim;
+                }
+                int sampleCount = doubleArrayColumn.getValuesCount() / elementCount;
+                size.addAndGet(doubleArrayColumn.getValuesCount() * 8); // 8 bytes per double
             }
             case FLOATARRAYCOLUMN -> {
             }

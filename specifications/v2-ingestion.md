@@ -289,11 +289,96 @@ This one is another special case, but it also seems like it should extend Scalar
 
 Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf EnumColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build EnumColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription.
 
-### 5.0 handling for non-scalar protobuf column data types
+### 5.0 handling for protobuf array column data types
 
-The remaining protobuf column data types are for handling non-scalar data values, so there are some slight changes to the tasks for adding handling for these column types.
+Next we are going to add support for the protobuf column messages that arrays of the corresponding scalar data types.  There are some slight changes to the tasks for adding handling for these column types.
 
-The first difference is that the BSON POJO document class will extend ColumnDocumentBase instead of ScalarColumnDocumentBase (or some intermediate base class that we think we should add).
+In the initial array column handling implementation, I'm thinking we should add a new intermediate base class ArrayColumnDocumentBase (like ScalarColumnDocumentBase) to be the base class of the new BSON document classes.  The protobuf array column messages all contain an ArrayDimensions message that specifies the array dimensions (up to 3 dimensions) using a list of uint32 values for x, y, and z dimensions, so that could be handled in the base class.
 
-The second difference is that none of these column data types will be 
+The list of values for each array type is in flattened row-major order.  My hunch is to store values as a binary blob, instead of as transparent values since we don't need to index the individual values for query by value purposes, and the individual values might be arbitrarily large.  The code for ingestion could look something like this (for DoubleArrayColumn):
+```
+Internal.DoubleList values = column.getValuesList();
+
+int elementCount = product(dimensions);
+int sampleCount = ...;
+
+int total = elementCount * sampleCount;
+
+ByteBuffer buffer = ByteBuffer.allocate(total * 8)
+                               .order(ByteOrder.LITTLE_ENDIAN);
+
+for (int i = 0; i < values.size(); i++) {
+    buffer.putDouble(values.getDouble(i));
+}
+
+byte[] binary = buffer.array();
+```
+
+Because we plan to eventually (but not initially) use MongoDB GridFS to handle individual data values that exceed the 16MB BSON object size limit, we should design the database schema in a way that supports this.  I'm thinking a "storage" field in the document, with a "kind" that can specify "inline" or "gridfs" with details relevant to that storage mechanism, e.g., for an array it would look like this:
+
+```
+{
+  "pv": "BPM:01:WAVEFORM",
+  "type": "double_array",
+  "payload": {
+    "dimensions": [1024],
+    "storage": {
+      "kind": "inline",
+      "data": BinData(...)
+    }
+  }
+}
+```
+
+And for GridFS it could look like this:
+```
+{
+  "pv": "BPM:01:WAVEFORM",
+  "type": "double_array",
+  "payload": {
+    "dimensions": [1024],
+    "storage": {
+      "kind": "gridfs",
+      "file_id": ObjectId("..."),
+      "size_bytes": 12345678
+    }
+  }
+}
+```
+
+So a unified model could look like this:
+```
+"storage": {
+  "kind": "inline" | "gridfs",
+  "data": BinData(...),          // if inline
+  "file_id": ObjectId(...),      // if gridfs
+  "size_bytes": 12345678         // optional but useful
+}
+```
+
+with storage code like this:
+```
+if (payloadSize <= INLINE_LIMIT) {
+    storage.kind = "inline";
+    storage.data = binary;
+} else {
+    fileId = writeToGridFS(binary);
+    storage.kind = "gridfs";
+    storage.fileId = fileId;
+}
+```
+
+One thing to consider in the design for the new ArrayColumnDocumentBase class is whether it should only support subclasses for the protobuf array column data types, or whether we should generalize it because we will want to use this same inline / gridfs storage schema for the other remaining column data types like ImageColumn, StructColumn, and SerializedDataColumn.  Or maybe we want two intermediate base classes, the higher-level one supporting the inline/gridfs storage schema and the lower-level one supuport array column data types specifically with the array dimensions and writing the data values to byte array etc.
+
+The second difference is that none of these column data types will support use as a "trigger" PV column in the ColumnTriggerUtility for the data event subscription framework, they will only support use as "target" PV columns.  This is because it doesn't make sense to compare two arrays of values using relational operators (in most cases).  So we'll need to modify the pattern in the integration test for covering the array data column types.  In those tests, we could ingest data for a scalar column data type like DoubleColumn to serve as the PvConditionTrigger for the event, as well as ingesting data for the array column data type.  We would include the array column data type in the data event subscription's DataEventOperation so that we receive buckets for the array column PV in the API's response stream.  I'm thinking we might as well just do this in each of the integration tests for the array column data types, but we could also add a single test covering all the column data types that can't be used as data event subscription triggers.  I kind of like the former because everything relevant to the column data type is in one place.  Let's discuss the approach before we proceed with the test coverage implementation.
+
+### 5.1.1 Add handling for the protobuf DoubleArrayColumn message data type
+
+First, we will add MLDP handling for the DoubleArrayColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".  We will add test coverage as a folow up task.
+
+As we add MLDP service handling for DoubleArrayColumn, let's discuss the approach for 1) design for the new base class(es) and 2) the inline/gridfs storage schema and writing the array values as a byte array for storage.
+
+### 5.1.2 Add integration test coverage for DoubleArrayColumn
+
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf DoubleArrayColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build DoubleArrayColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription.
 

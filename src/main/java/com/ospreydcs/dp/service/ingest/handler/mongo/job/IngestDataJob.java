@@ -5,12 +5,12 @@ import com.mongodb.client.result.InsertOneResult;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
+import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.handler.HandlerJob;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionRequest;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionResult;
 import com.ospreydcs.dp.service.ingest.handler.mongo.client.MongoIngestionClientInterface;
 import com.ospreydcs.dp.service.ingest.handler.mongo.MongoIngestionHandler;
-import com.ospreydcs.dp.service.ingest.model.DpIngestionException;
 import com.ospreydcs.dp.service.ingest.model.IngestionRequestStatus;
 import com.ospreydcs.dp.service.ingest.model.IngestionTaskResult;
 import org.apache.logging.log4j.LogManager;
@@ -90,7 +90,7 @@ public class IngestDataJob extends HandlerJob {
                 List<BucketDocument> dataDocumentBatch = null;
                 try {
                     dataDocumentBatch = BucketDocument.generateBucketsFromRequest(request, providerName);
-                } catch (DpIngestionException e) {
+                } catch (DpException e) {
                     isError = true;
                     errorMsg = e.getMessage();
                     status = IngestionRequestStatus.ERROR;

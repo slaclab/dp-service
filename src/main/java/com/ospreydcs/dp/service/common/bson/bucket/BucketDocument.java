@@ -14,8 +14,8 @@ import com.ospreydcs.dp.service.common.bson.column.Int32ColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.BoolColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.StringColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.EnumColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.DoubleArrayColumnDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
-import com.ospreydcs.dp.service.ingest.model.DpIngestionException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -133,7 +133,7 @@ public class BucketDocument extends DpBsonDocumentBase {
      * @return
      */
     public static List<BucketDocument> generateBucketsFromRequest(IngestDataRequest request, String providerName)
-            throws DpIngestionException {
+            throws DpException {
 
         final List<BucketDocument> bucketList = new ArrayList<>();
 
@@ -188,6 +188,12 @@ public class BucketDocument extends DpBsonDocumentBase {
         // create BucketDocument for each EnumColumn
         for (EnumColumn column : request.getIngestionDataFrame().getEnumColumnsList()) {
             ColumnDocumentBase columnDocument = EnumColumnDocument.fromEnumColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each DoubleArrayColumn
+        for (DoubleArrayColumn column : request.getIngestionDataFrame().getDoubleArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = DoubleArrayColumnDocument.fromDoubleArrayColumn(column);
             bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 

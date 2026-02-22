@@ -113,10 +113,18 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 | DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" | ✅ |
 | FloatColumn | `ScalarColumnDocumentBase<Float>` | FloatColumnDocument | "floatColumn" | ✅ |
 | Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" | ✅ |
-| Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" | |
-| BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | |
-| StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | |
-| EnumColumn | `ScalarColumnDocumentBase<Integer>` | EnumColumnDocument | "enumColumn" | |
+| Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" | ✅ |
+| BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | ✅ |
+| StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | ✅ |
+| EnumColumn | `ScalarColumnDocumentBase<Integer>` + `enumId` | EnumColumnDocument | "enumColumn" | ✅ |
+
+**EnumColumn Hybrid Design:**
+EnumColumn uses a hybrid approach that extends the scalar pattern with additional semantic metadata:
+- **Base Pattern**: Extends `ScalarColumnDocumentBase<Integer>` for `List<Integer> values` handling
+- **Additional Field**: Adds `String enumId` field for enum semantic context (e.g., "epics:alarm_status:v1")
+- **Custom Conversion**: Overrides `toProtobufColumn()` to include `enumId` field in protobuf output
+- **Integer Triggers**: Uses integer comparison for data event triggers since Integer implements Comparable
+- **Semantic Preservation**: Maintains enum meaning while leveraging scalar column efficiency
 
 **Benefits of Generic Base Class:**
 - **Code Reuse**: `List<T> values` field and common methods inherited from base

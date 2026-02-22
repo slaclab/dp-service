@@ -124,6 +124,9 @@ public class ColumnTriggerUtility {
             case STRUCTCOLUMN -> {
             }
             case DOUBLEARRAYCOLUMN -> {
+                final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
+                        + dataBucket.getDoubleArrayColumn().getName() + ")";
+                return new ColumnTriggerResult(true, errorMsg, null);
             }
             case FLOATARRAYCOLUMN -> {
             }
