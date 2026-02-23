@@ -406,7 +406,19 @@ Please include coverage of data subscription and data event subscription.  Data 
 
 Next, we will add MLDP service handling and integration test coverage for the Int32ArrayColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto following the steps 1 through 7 under section "4.0 Handling for Additional Protobuf Column Messages".  
 
-The BSON POJO document class should extend ArrayColumnDocumentBase, and follow the patterns established for DoubleArrayColumh handling.
+The BSON POJO document class should extend ArrayColumnDocumentBase, and follow the patterns established for DoubleArrayColumn handling.
+
+For integration test coverage, it is very important to follow the pattern of DoubleArrayColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build arrays of the approrpriate protobuf type and adding appropriate data values.
+
+Please skip the coverage of tabular data export at the end of the test.
+
+Please include coverage of data subscription and data event subscription.  Data event subscription coverage should follow the pattern established in task 5.1.2 for DoubleArrayColumn integration testing, where we need to ingest data for a scalar PV in both ingestion scenarios (in addition to the array column target PV), create a PvConditionTrigger for the scalar PV to use in the subscription, and create a DataOperation for the subscription that uses the array column target PV.
+
+### 5.4 Add handling and integration test coverage for the protobuf Int64ArrayColumn message data type
+
+Next, we will add MLDP service handling and integration test coverage for the Int64ArrayColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto following the steps 1 through 7 under section "4.0 Handling for Additional Protobuf Column Messages".
+
+The BSON POJO document class should extend ArrayColumnDocumentBase, and follow the patterns established for DoubleArrayColumn handling.
 
 For integration test coverage, it is very important to follow the pattern of DoubleArrayColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build arrays of the approrpriate protobuf type and adding appropriate data values.
 

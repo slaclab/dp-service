@@ -139,6 +139,9 @@ public class ColumnTriggerUtility {
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case INT64ARRAYCOLUMN -> {
+                final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
+                        + dataBucket.getInt64ArrayColumn().getName() + ")";
+                return new ColumnTriggerResult(true, errorMsg, null);
             }
             case BOOLARRAYCOLUMN -> {
             }

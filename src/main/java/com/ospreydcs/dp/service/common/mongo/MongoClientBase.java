@@ -110,7 +110,8 @@ public abstract class MongoClientBase {
                 ArrayColumnDocumentBase.class,
                 DoubleArrayColumnDocument.class,
                 FloatArrayColumnDocument.class,
-                Int32ArrayColumnDocument.class
+                Int32ArrayColumnDocument.class,
+                Int64ArrayColumnDocument.class
         ).build();
 
         //        CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();

@@ -19,6 +19,7 @@ import com.ospreydcs.dp.service.common.bson.column.EnumColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.DoubleArrayColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.FloatArrayColumnDocument;
 import com.ospreydcs.dp.service.common.bson.column.Int32ArrayColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.Int64ArrayColumnDocument;
 import com.ospreydcs.dp.service.common.config.ConfigurationManager;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.model.TimestampMap;
@@ -680,6 +681,10 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     assertTrue(
                             request.getIngestionDataFrame().getInt32ArrayColumnsList().contains(
                                     (Int32ArrayColumn) columnDocument.toProtobufColumn()));
+                } else if (columnDocument instanceof Int64ArrayColumnDocument) {
+                    assertTrue(
+                            request.getIngestionDataFrame().getInt64ArrayColumnsList().contains(
+                                    (Int64ArrayColumn) columnDocument.toProtobufColumn()));
                 } else {
                     fail("unexpected columnDocument type: " + columnDocument);
                 }
