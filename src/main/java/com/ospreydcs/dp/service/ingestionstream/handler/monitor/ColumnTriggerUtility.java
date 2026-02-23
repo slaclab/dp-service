@@ -129,6 +129,9 @@ public class ColumnTriggerUtility {
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case FLOATARRAYCOLUMN -> {
+                final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
+                        + dataBucket.getFloatArrayColumn().getName() + ")";
+                return new ColumnTriggerResult(true, errorMsg, null);
             }
             case INT32ARRAYCOLUMN -> {
             }

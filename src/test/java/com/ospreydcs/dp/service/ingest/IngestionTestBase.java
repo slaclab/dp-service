@@ -76,6 +76,7 @@ public class IngestionTestBase {
         private List<StringColumn> stringColumnList = null;
         private List<EnumColumn> enumColumnList = null;
         private List<DoubleArrayColumn> doubleArrayColumnList = null;
+        private List<FloatArrayColumn> floatArrayColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -223,6 +224,14 @@ public class IngestionTestBase {
 
         public void setDoubleArrayColumnList(List<DoubleArrayColumn> doubleArrayColumnList) {
             this.doubleArrayColumnList = doubleArrayColumnList;
+        }
+
+        public List<FloatArrayColumn> floatArrayColumnList() {
+            return floatArrayColumnList;
+        }
+
+        public void setFloatArrayColumnList(List<FloatArrayColumn> floatArrayColumnList) {
+            this.floatArrayColumnList = floatArrayColumnList;
         }
 
         public List<FloatColumn> floatColumnList() {
@@ -470,17 +479,25 @@ public class IngestionTestBase {
             // use list of BoolColumns provided by caller
             dataFrameBuilder.addAllBoolColumns(params.boolColumnList());
         }
+
         if (params.stringColumnList() != null) {
             // use list of StringColumns provided by caller
             dataFrameBuilder.addAllStringColumns(params.stringColumnList());
         }
+
         if (params.enumColumnList() != null) {
             // use list of EnumColumns provided by caller
             dataFrameBuilder.addAllEnumColumns(params.enumColumnList());
         }
+
         if (params.doubleArrayColumnList() != null) {
             // use list of DoubleArrayColumns provided by caller
             dataFrameBuilder.addAllDoubleArrayColumns(params.doubleArrayColumnList());
+        }
+
+        if (params.floatArrayColumnList() != null) {
+            // use list of FloatArrayColumns provided by caller
+            dataFrameBuilder.addAllFloatArrayColumns(params.floatArrayColumnList());
         }
 
         dataFrameBuilder.build();

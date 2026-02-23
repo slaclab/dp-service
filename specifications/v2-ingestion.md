@@ -380,9 +380,24 @@ As we add MLDP service handling for DoubleArrayColumn, let's discuss the approac
 
 ### 5.1.2 Add integration test coverage for DoubleArrayColumn
 
-Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf DoubleArrayColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build DoubleArrayColumn instead of DoubleColumn, and of course using bool data values instead of doubles.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription.
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf DoubleArrayColumn.  It is very important to follow the pattern of DoubleColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build DoubleArrayColumn instead of DoubleColumn, and of course adding data values of the appropriate type to the array.  Please skip the coverage of tabular data export at the end of the test.  Please include coverage of data subscription and data event subscription.
 
 We need to modify the pattern for data event subscription coverage as mentioned under task 5.0, so let's discuss the approach before we proceed.  We need to decide if we want a single data event subscription test class covering the use of BinaryColumnDocumentBase subclasses as target PV columns in subscriptions, or if we want to add that coverage to each of the subclass-specific integration tests.  I'm thinking the latter so that everything for the column data type is in one class.  It means some duplication, but it doesn't seem like that much.
 
 We'll need to ingest data for a scalar PV that can serve as the target for the data event subscription, in addition to ingesting for the binary column PV.  We'll need to change the code for creating the data event subscription to use the scalar PV in the PvConditionTrigger and the binary PV in the DataEventOperation.
 
+### 5.2.1 Add handling for the protobuf FloatArrayColumn message data type
+
+Next, we will add MLDP handling for the FloatArrayColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.  We will first add handling support to the MLDP services as described in steps 1 through 5 under section "4.0 Handling for Additional Protobuf Column Messages".  The BSON POJO document class should extend ArrayColumnDocumentBase, and follow the patterns established for DoubleArrayColumh handling.
+
+We will add test coverage as a folow up task.
+
+### 5.2.2 Add integration test coverage for FloatArrayColumn
+
+Please complete steps 6 and 7 under section "4.0 Handling for Additional Protobuf Column Messages" for adding integration test framework support and coverage for the protobuf FloatArrayColumn.  
+
+It is very important to follow the pattern of DoubleArrayColumnIT as closely as possible, you'll save both of us extra work and thinking.  It should mostly be a matter of changing the code to build FloatArrayColumn for ingestion requests and verification, and of course using adding the appropriate type of data values to the array.  
+
+Please skip the coverage of tabular data export at the end of the test.  
+
+Please include coverage of data subscription and data event subscription.  Data event subscription coverage should follow the pattern established in task 5.1.2 for DoubleArrayColumn intetgration testing, where we need to ingest data for a scalar PV in both ingestion scenarios (in addition to the array column target PV), create a PvConditionTrigger for the scalar PV to use in the subscription, and create a DataOperation for the subscription that uses the array column target PV.

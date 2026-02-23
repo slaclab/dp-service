@@ -345,6 +345,15 @@ public class DataBuffer {
                 size.addAndGet(doubleArrayColumn.getValuesCount() * 8); // 8 bytes per double
             }
             case FLOATARRAYCOLUMN -> {
+                final FloatArrayColumn floatArrayColumn = dataBucket.getFloatArrayColumn();
+                size.addAndGet(floatArrayColumn.getName().length() * 2);
+                // Calculate array size: elements per sample × samples × 4 bytes per float
+                int elementCount = 1;
+                for (int dim : floatArrayColumn.getDimensions().getDimsList()) {
+                    elementCount *= dim;
+                }
+                int sampleCount = floatArrayColumn.getValuesCount() / elementCount;
+                size.addAndGet(floatArrayColumn.getValuesCount() * 4); // 4 bytes per float
             }
             case INT32ARRAYCOLUMN -> {
             }
