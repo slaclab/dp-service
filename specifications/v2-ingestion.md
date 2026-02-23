@@ -425,3 +425,15 @@ For integration test coverage, it is very important to follow the pattern of Dou
 Please skip the coverage of tabular data export at the end of the test.
 
 Please include coverage of data subscription and data event subscription.  Data event subscription coverage should follow the pattern established in task 5.1.2 for DoubleArrayColumn integration testing, where we need to ingest data for a scalar PV in both ingestion scenarios (in addition to the array column target PV), create a PvConditionTrigger for the scalar PV to use in the subscription, and create a DataOperation for the subscription that uses the array column target PV.
+
+### 5.5 Add handling and integration test coverage for the protobuf BoolArrayColumn message data type
+
+Next, we will add MLDP service handling and integration test coverage for the BoolArrayColumn message defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto following the steps 1 through 7 under section "4.0 Handling for Additional Protobuf Column Messages".
+
+The BSON POJO document class should extend ArrayColumnDocumentBase, and follow the patterns established for DoubleArrayColumn handling.
+
+For integration test coverage, it is very important to follow the pattern of Int32ArrayColumnIT as closely as possible, you'll save both of us extra work and thinking.  We wasted a lot of time on the last implementation because of not following the patterns exactly.  It should mostly be a matter of changing the ingestion and data event subscription code to use BoolArrayColumn and booean values instead of Int32ArrayColumn and int.
+
+Please skip the coverage of tabular data export at the end of the test.
+
+Data event subscription coverage should follow the pattern established in task 5.1.2 for DoubleArrayColumn integration testing, where we need to ingest data for a scalar PV in both ingestion scenarios (in addition to the array column target PV), create a PvConditionTrigger for the scalar PV to use in the subscription, and create a DataOperation for the subscription that uses the array column target PV.  Again, this is included in the Int32ArrayColumnIT and we want to follow that pattern EXACTLY except for changing the data types and structures.  There is NO REASON to make other changes to the pattern that just make it harder to diagnose failures.

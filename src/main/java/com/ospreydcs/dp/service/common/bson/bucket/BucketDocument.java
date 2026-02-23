@@ -3,21 +3,9 @@ package com.ospreydcs.dp.service.common.bson.bucket;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataRequest;
-import com.ospreydcs.dp.service.common.bson.column.ColumnDocumentBase;
-import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.bson.DataTimestampsDocument;
 import com.ospreydcs.dp.service.common.bson.DpBsonDocumentBase;
-import com.ospreydcs.dp.service.common.bson.column.DoubleColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.FloatColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int64ColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int32ColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.BoolColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.StringColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.EnumColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.DoubleArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.FloatArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int32ArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int64ArrayColumnDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
 
 import java.util.ArrayList;
@@ -215,6 +203,12 @@ public class BucketDocument extends DpBsonDocumentBase {
         // create BucketDocument for each Int64ArrayColumn
         for (Int64ArrayColumn column : request.getIngestionDataFrame().getInt64ArrayColumnsList()) {
             ColumnDocumentBase columnDocument = Int64ArrayColumnDocument.fromInt64ArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each BoolArrayColumn
+        for (BoolArrayColumn column : request.getIngestionDataFrame().getBoolArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = BoolArrayColumnDocument.fromBoolArrayColumn(column);
             bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 

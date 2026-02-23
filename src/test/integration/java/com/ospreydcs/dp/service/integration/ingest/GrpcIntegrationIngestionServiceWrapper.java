@@ -7,19 +7,7 @@ import com.ospreydcs.dp.grpc.v1.ingestion.*;
 import com.ospreydcs.dp.service.common.bson.ProviderDocument;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
-import com.ospreydcs.dp.service.common.bson.column.ColumnDocumentBase;
-import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.DoubleColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.FloatColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int64ColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int32ColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.BoolColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.StringColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.EnumColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.DoubleArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.FloatArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int32ArrayColumnDocument;
-import com.ospreydcs.dp.service.common.bson.column.Int64ArrayColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.config.ConfigurationManager;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.model.TimestampMap;
@@ -685,6 +673,10 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     assertTrue(
                             request.getIngestionDataFrame().getInt64ArrayColumnsList().contains(
                                     (Int64ArrayColumn) columnDocument.toProtobufColumn()));
+                } else if (columnDocument instanceof BoolArrayColumnDocument) {
+                    assertTrue(
+                            request.getIngestionDataFrame().getBoolArrayColumnsList().contains(
+                                    (BoolArrayColumn) columnDocument.toProtobufColumn()));
                 } else {
                     fail("unexpected columnDocument type: " + columnDocument);
                 }

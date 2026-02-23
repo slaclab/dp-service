@@ -378,6 +378,15 @@ public class DataBuffer {
                 size.addAndGet(int64ArrayColumn.getValuesCount() * 8); // 8 bytes per int64
             }
             case BOOLARRAYCOLUMN -> {
+                final BoolArrayColumn boolArrayColumn = dataBucket.getBoolArrayColumn();
+                size.addAndGet(boolArrayColumn.getName().length() * 2);
+                // Calculate array size: elements per sample × samples × 1 byte per bool
+                int elementCount = 1;
+                for (int dim : boolArrayColumn.getDimensions().getDimsList()) {
+                    elementCount *= dim;
+                }
+                int sampleCount = boolArrayColumn.getValuesCount() / elementCount;
+                size.addAndGet(boolArrayColumn.getValuesCount() * 1); // 1 byte per bool
             }
             case DATA_NOT_SET -> {
             }
