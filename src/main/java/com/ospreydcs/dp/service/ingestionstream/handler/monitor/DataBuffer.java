@@ -356,6 +356,15 @@ public class DataBuffer {
                 size.addAndGet(floatArrayColumn.getValuesCount() * 4); // 4 bytes per float
             }
             case INT32ARRAYCOLUMN -> {
+                final Int32ArrayColumn int32ArrayColumn = dataBucket.getInt32ArrayColumn();
+                size.addAndGet(int32ArrayColumn.getName().length() * 2);
+                // Calculate array size: elements per sample × samples × 4 bytes per int32
+                int elementCount = 1;
+                for (int dim : int32ArrayColumn.getDimensions().getDimsList()) {
+                    elementCount *= dim;
+                }
+                int sampleCount = int32ArrayColumn.getValuesCount() / elementCount;
+                size.addAndGet(int32ArrayColumn.getValuesCount() * 4); // 4 bytes per int32
             }
             case INT64ARRAYCOLUMN -> {
             }
