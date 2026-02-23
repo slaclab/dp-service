@@ -331,8 +331,6 @@ public class DataBuffer {
             }
             case IMAGECOLUMN -> {
             }
-            case STRUCTCOLUMN -> {
-            }
             case DOUBLEARRAYCOLUMN -> {
                 final DoubleArrayColumn doubleArrayColumn = dataBucket.getDoubleArrayColumn();
                 size.addAndGet(doubleArrayColumn.getName().length() * 2);
@@ -387,6 +385,15 @@ public class DataBuffer {
                 }
                 int sampleCount = boolArrayColumn.getValuesCount() / elementCount;
                 size.addAndGet(boolArrayColumn.getValuesCount() * 1); // 1 byte per bool
+            }
+            case STRUCTCOLUMN -> {
+                final StructColumn structColumn = dataBucket.getStructColumn();
+                size.addAndGet(structColumn.getName().length() * 2); // name field
+                size.addAndGet(structColumn.getSchemaId().length() * 2); // schemaId field
+                // Calculate struct size: sum of all struct value byte arrays
+                for (com.google.protobuf.ByteString structValue : structColumn.getValuesList()) {
+                    size.addAndGet(structValue.size()); // size of each struct
+                }
             }
             case DATA_NOT_SET -> {
             }

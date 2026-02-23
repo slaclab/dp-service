@@ -437,3 +437,34 @@ For integration test coverage, it is very important to follow the pattern of Int
 Please skip the coverage of tabular data export at the end of the test.
 
 Data event subscription coverage should follow the pattern established in task 5.1.2 for DoubleArrayColumn integration testing, where we need to ingest data for a scalar PV in both ingestion scenarios (in addition to the array column target PV), create a PvConditionTrigger for the scalar PV to use in the subscription, and create a DataOperation for the subscription that uses the array column target PV.  Again, this is included in the Int32ArrayColumnIT and we want to follow that pattern EXACTLY except for changing the data types and structures.  There is NO REASON to make other changes to the pattern that just make it harder to diagnose failures.
+
+### 6.0 handling for binary valued protobuf column data types
+
+We have implemented handling for all the new scalar and array-of-scalar protobuf column data types.  We have two special cases where each sample value is a byte string, StructColumn and ImageColumn.  We will handle these one at a time in sections 6.1 asnd 6.2, respectively.  But let's talk first about the general approach.
+
+In general, the steps are exactly the same as we established in section 4.0 for handling additional protobuf column messages.  The key difference is that the new BSON POJO document class for these two column data types will extend BinaryColumnDocumentBase because they will use our new inline/gridfs storage schema.
+
+The integration test coverage pattern will be very much like the array column tests, e.g., Int32ArrayColumnIT.  As with the array column tests, StructColumn and ImageColumn cannot be used as data event subscription trigger PV columns, only as target PV columns.  So the test pattern should be pretty much the same as the array column test, except that we create a different type of data column and data value.
+
+As we've said before, it is extremely important to follow the existing patterns as closely as possible, especially for the integration test coverage.  It is very hard to diagnose failures when there are significant differences between the new test and existing ones.
+
+### 6.1 handling and integration test coverage for StructColumn
+
+StructColumn is defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto, and pasted below.
+
+```
+message StructColumn {
+  string name = 1;
+  string schemaId = 2; // e.g. "beam_position:v3"
+  // One struct per sample
+  repeated bytes values = 3;
+}
+```
+
+This column contains a byte string for each sample value, that is a struct that is serialized to byte string format.  The schemaId is used to decipher what sort of struct is encoded in each sample value.
+
+Handling for this column should be very much like the array column data types, e.g., Int32ArrayColumn.  We will complete the 7 steps listed in section 4.0, with the additional details described in section 6.0.
+
+The key difference is to extend the new BSON document class from BinaryColumnDocumentBase.
+
+The integration test coverage should follow Int32ArrayColumnIT very closely, just changing the column and sample value data types as appropriate (for changing from Int32Column/int to StructColumn/byte string).  The pattern for covering the data event subscription API is the same, we musst ingest data for both a scalar trigger PV and a binary target PV (StructColumn).  Please follow the patterns as closely as you can.

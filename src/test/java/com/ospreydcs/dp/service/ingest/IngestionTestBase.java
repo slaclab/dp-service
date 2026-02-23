@@ -80,6 +80,7 @@ public class IngestionTestBase {
         private List<Int32ArrayColumn> int32ArrayColumnList = null;
         private List<Int64ArrayColumn> int64ArrayColumnList = null;
         private List<BoolArrayColumn> boolArrayColumnList = null;
+        private List<StructColumn> structColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -259,6 +260,14 @@ public class IngestionTestBase {
 
         public void setBoolArrayColumnList(List<BoolArrayColumn> boolArrayColumnList) {
             this.boolArrayColumnList = boolArrayColumnList;
+        }
+
+        public List<StructColumn> structColumnList() {
+            return structColumnList;
+        }
+
+        public void setStructColumnList(List<StructColumn> structColumnList) {
+            this.structColumnList = structColumnList;
         }
 
         public List<FloatColumn> floatColumnList() {
@@ -540,6 +549,11 @@ public class IngestionTestBase {
         if (params.boolArrayColumnList() != null) {
             // use list of BoolArrayColumns provided by caller
             dataFrameBuilder.addAllBoolArrayColumns(params.boolArrayColumnList());
+        }
+
+        if (params.structColumnList() != null) {
+            // use list of StructColumns provided by caller
+            dataFrameBuilder.addAllStructColumns(params.structColumnList());
         }
 
         dataFrameBuilder.build();

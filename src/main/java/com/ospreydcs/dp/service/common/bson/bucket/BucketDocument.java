@@ -212,6 +212,12 @@ public class BucketDocument extends DpBsonDocumentBase {
             bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 
+        // create BucketDocument for each StructColumn
+        for (StructColumn column : request.getIngestionDataFrame().getStructColumnsList()) {
+            ColumnDocumentBase columnDocument = StructColumnDocument.fromStructColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
         return bucketList;
     }
 

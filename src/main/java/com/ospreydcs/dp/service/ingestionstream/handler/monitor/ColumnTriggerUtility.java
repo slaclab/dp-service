@@ -121,8 +121,6 @@ public class ColumnTriggerUtility {
             }
             case IMAGECOLUMN -> {
             }
-            case STRUCTCOLUMN -> {
-            }
             case DOUBLEARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
                         + dataBucket.getDoubleArrayColumn().getName() + ")";
@@ -146,6 +144,11 @@ public class ColumnTriggerUtility {
             case BOOLARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
                         + dataBucket.getBoolArrayColumn().getName() + ")";
+                return new ColumnTriggerResult(true, errorMsg, null);
+            }
+            case STRUCTCOLUMN -> {
+                final String errorMsg = "Binary column types cannot be used as data event triggers (PV: " 
+                        + dataBucket.getStructColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case DATA_NOT_SET -> {
