@@ -107,7 +107,9 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 }
 ```
 
-**Scalar Column Type Mappings:**
+**Column Type Implementation Status:**
+
+**Scalar Columns:**
 | Proto Message | Java Generic Type | Document Class | BSON Discriminator | Status |
 |--------------|------------------|----------------|-------------------|--------|
 | DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" | ✅ |
@@ -117,6 +119,29 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 | BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | ✅ |
 | StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | ✅ |
 | EnumColumn | `ScalarColumnDocumentBase<Integer>` + `enumId` | EnumColumnDocument | "enumColumn" | ✅ |
+
+**Array Columns:**
+| Proto Message | Base Class | Document Class | BSON Discriminator | Status |
+|--------------|-------------|----------------|-------------------|--------|
+| DoubleArrayColumn | `ArrayColumnDocumentBase` | DoubleArrayColumnDocument | "doubleArrayColumn" | ✅ |
+| FloatArrayColumn | `ArrayColumnDocumentBase` | FloatArrayColumnDocument | "floatArrayColumn" | ✅ |
+| Int32ArrayColumn | `ArrayColumnDocumentBase` | Int32ArrayColumnDocument | "int32ArrayColumn" | ✅ |
+| Int64ArrayColumn | `ArrayColumnDocumentBase` | Int64ArrayColumnDocument | "int64ArrayColumn" | ✅ |
+| BoolArrayColumn | `ArrayColumnDocumentBase` | BoolArrayColumnDocument | "boolArrayColumn" | ✅ |
+
+**Binary Columns:**
+| Proto Message | Base Class | Document Class | BSON Discriminator | Special Features | Status |
+|--------------|-------------|----------------|-------------------|------------------|--------|
+| StructColumn | `BinaryColumnDocumentBase` | StructColumnDocument | "structColumn" | schemaId field | ✅ |
+| ImageColumn | `BinaryColumnDocumentBase` | ImageColumnDocument | "imageColumn" | ImageDescriptor helper | ✅ |
+
+**Legacy Columns:**
+| Proto Message | Current Implementation | Planned Update | Status |
+|--------------|----------------------|----------------|--------|
+| SerializedDataColumn | Legacy pattern | Update to new framework patterns | 📋 Planned |
+| DataColumn | Legacy pattern | Maintain for backward compatibility | ✅ Legacy |
+
+**Note**: SerializedDataColumn exists with legacy implementation but may benefit from updates to follow the new systematic patterns for consistency and maintainability.
 
 **EnumColumn Hybrid Design:**
 EnumColumn uses a hybrid approach that extends the scalar pattern with additional semantic metadata:
@@ -139,6 +164,108 @@ EnumColumn uses a hybrid approach that extends the scalar pattern with additiona
 - `getBytes()` - Serializes protobuf column to byte array
 - `toProtobufColumn()` - Template method for creating typed protobuf column
 - `addColumnToBucket()` - Abstract method implementation for query result API integration
+
+## Systematic Process for Adding New Protobuf Column Types
+
+The ingestion service uses a proven **7-step systematic process** for adding complete support for new protobuf column types. This process has been successfully applied to scalar columns (DoubleColumn, FloatColumn, etc.), array columns (DoubleArrayColumn, FloatArrayColumn, etc.), and binary columns (StructColumn, ImageColumn).
+
+### Column Type Categories and Base Classes
+
+**Scalar Columns**: Simple value types that extend `ScalarColumnDocumentBase<T>`
+- DoubleColumn → DoubleColumnDocument extends `ScalarColumnDocumentBase<Double>`
+- FloatColumn → FloatColumnDocument extends `ScalarColumnDocumentBase<Float>`
+- Int64Column → Int64ColumnDocument extends `ScalarColumnDocumentBase<Long>`
+- Int32Column → Int32ColumnDocument extends `ScalarColumnDocumentBase<Integer>`
+- BoolColumn → BoolColumnDocument extends `ScalarColumnDocumentBase<Boolean>`
+- StringColumn → StringColumnDocument extends `ScalarColumnDocumentBase<String>`
+- EnumColumn → EnumColumnDocument extends `ScalarColumnDocumentBase<Integer>`
+
+**Array Columns**: Multi-dimensional arrays that extend `ArrayColumnDocumentBase`
+- DoubleArrayColumn → DoubleArrayColumnDocument extends `ArrayColumnDocumentBase`
+- FloatArrayColumn → FloatArrayColumnDocument extends `ArrayColumnDocumentBase`
+- Int32ArrayColumn → Int32ArrayColumnDocument extends `ArrayColumnDocumentBase`
+- Int64ArrayColumn → Int64ArrayColumnDocument extends `ArrayColumnDocumentBase`
+- BoolArrayColumn → BoolArrayColumnDocument extends `ArrayColumnDocumentBase`
+
+**Binary Columns**: Variable-length binary data that extend `BinaryColumnDocumentBase`
+- StructColumn → StructColumnDocument extends `BinaryColumnDocumentBase` (with schemaId)
+- ImageColumn → ImageColumnDocument extends `BinaryColumnDocumentBase` (with ImageDescriptor)
+
+### 7-Step Implementation Process
+
+**Step 1: Create Document Class**
+- Choose appropriate base class (Scalar/Array/BinaryColumnDocumentBase)
+- Add `@BsonDiscriminator(key = "_t", value = "columnType")` annotation
+- Implement required abstract methods from base class
+- Add static factory method `fromProtobufColumn(ProtobufColumn column)`
+- For binary columns: implement `toProtobufColumn()` and `deserializeToProtobufColumn()`
+
+**Step 2: Update BucketDocument Generation**
+- Add new column type handling in `BucketDocument.generateBucketsFromRequest()`
+- Follow pattern: `for (NewColumn column : request.getNewColumnsList()) { ... }`
+- Create document using factory method: `ColumnDocumentBase columnDocument = NewColumnDocument.fromNewColumn(column)`
+
+**Step 3: Register POJO Class in MongoDB Codec**
+- Add document class to `MongoClientBase.getPojoCodecRegistry()`
+- For embedded helper classes (e.g., ImageDescriptorDocument), register separately
+- Ensures proper MongoDB serialization/deserialization
+
+**Step 4: Add Data Subscription Support**
+- Update `SourceMonitorManager.publishDataSubscriptions()`
+- Add new column type case in switch statement for DataBucket creation
+- Pattern: `case NEWCOLUMN -> bucketBuilder.setNewColumn((NewColumn) columnDocument.toProtobufColumn())`
+
+**Step 5: Add Event Subscription Framework Support**
+- Update `ColumnTriggerUtility` for trigger support (scalar columns only)
+- Update `DataBuffer` for size estimation and storage
+- Binary and array columns serve as targets only, not triggers
+
+**Step 6: Update Test Framework Support**
+- Add `List<NewColumn> newColumnList` field to `IngestionTestBase.IngestionRequestParams`
+- Add getter/setter methods: `newColumnList()` and `setNewColumnList()`
+- Update `buildIngestionRequest()` to include new column data: `dataFrameBuilder.addAllNewColumns(params.newColumnList())`
+- Add verification logic to `GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`
+
+**Step 7: Create Integration Test Coverage**
+- Create `NewColumnIT` class extending `GrpcIntegrationTestBase`
+- **Scalar Columns**: Follow `DoubleColumnIT` pattern with single PV approach
+- **Array/Binary Columns**: Follow dual PV approach (scalar trigger + array/binary target)
+- Test coverage: ingestion → query → data subscription → event subscription
+- Verify round-trip data integrity using `assertEquals(originalColumn, retrievedColumn)`
+
+### Class Hierarchy Design Issues
+
+**Known Technical Debt**: The methods `createColumnBuilder()` and `addAllValuesToBuilder()` are defined at `ColumnDocumentBase` level but only apply to scalar columns. Array and binary columns must implement these with `UnsupportedOperationException`. Future refactoring should move these methods to `ScalarColumnDocumentBase`.
+
+### Integration Test Patterns
+
+**Single PV Approach (Scalar Columns)**:
+- Use the column type directly as both ingestion data and trigger/target
+- Simpler test structure with direct column verification
+
+**Dual PV Approach (Array/Binary Columns)**:
+- Scalar PV serves as trigger for event subscriptions
+- Array/binary PV serves as target for event subscriptions
+- Required because array/binary columns cannot function as trigger PVs
+- Both PVs included in initial ingestion for proper validation
+
+**Test Verification Pattern**:
+```java
+// Standard verification for all column types
+DataColumnDocument dataColumnDocument = bucketDocument.getDataColumnDocument();
+NewColumn storedColumn = (NewColumn) dataColumnDocument.toProtobufColumn();
+assertTrue(request.getIngestionDataFrame().getNewColumnsList().contains(storedColumn));
+assertEquals(originalColumn, retrievedColumn); // Round-trip integrity
+```
+
+### Benefits of Systematic Approach
+
+- **Consistency**: All column types follow identical implementation patterns
+- **Completeness**: Covers full pipeline from ingestion through query and subscriptions
+- **Maintainability**: Centralized patterns make debugging and enhancements easier  
+- **Extensibility**: Adding new column types requires minimal framework changes
+- **Quality**: Comprehensive test coverage catches integration issues early
+- **Documentation**: Self-documenting code patterns reduce learning curve
 
 ### Binary Column Document Class Hierarchy
 
@@ -427,16 +554,17 @@ FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
 
 ### V2 API Integration Test Coverage
 - **Test Location**: `src/test/java/com/ospreydcs/dp/service/integration/v2api/`
-- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`)
+- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`, `StructColumnIT`, `ImageColumnIT`)
 - **Comprehensive Coverage**: Each test class covers ingestion, query, and subscription APIs for one column type
 - **Query API Integration**: Tests verify `addColumnToBucket()` method implementation for query result assembly
-- **Framework Pattern**: Same integration test structure applies to scalar and complex column types
+- **Framework Pattern**: Same integration test structure applies to scalar, array, and binary column types
 
-#### Array Column Test Patterns
-- **Dual PV Approach**: Array integration tests use scalar columns as triggers and array columns as targets
-- **Event Subscriptions**: Array columns cannot serve as trigger PVs, requiring scalar trigger + array target pattern
-- **PV Validation**: Both scalar and array PVs included in initial ingestion for proper subscription validation
-- **Export Testing**: Array columns skip tabular export tests due to binary storage limitations
+#### Array and Binary Column Test Patterns
+- **Dual PV Approach**: Array and binary integration tests use scalar columns as triggers and array/binary columns as targets
+- **Event Subscriptions**: Array and binary columns cannot serve as trigger PVs, requiring scalar trigger + target column pattern
+- **PV Validation**: Both scalar and target PVs included in initial ingestion for proper subscription validation
+- **Export Testing**: Array and binary columns skip tabular export tests due to binary storage limitations
+- **Binary Column Types**: StructColumn (with schemaId) and ImageColumn (with ImageDescriptor) extend BinaryColumnDocumentBase
 
 ### Scalar Column Document Test Coverage  
 - **Unit Tests**: `ScalarColumnDocumentBaseTest` - Basic functionality of generic base class

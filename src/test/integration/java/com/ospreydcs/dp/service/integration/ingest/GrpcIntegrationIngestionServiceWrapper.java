@@ -681,6 +681,10 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     assertTrue(
                             request.getIngestionDataFrame().getStructColumnsList().contains(
                                     (StructColumn) columnDocument.toProtobufColumn()));
+                } else if (columnDocument instanceof ImageColumnDocument) {
+                    assertTrue(
+                            request.getIngestionDataFrame().getImageColumnsList().contains(
+                                    (ImageColumn) columnDocument.toProtobufColumn()));
                 } else {
                     fail("unexpected columnDocument type: " + columnDocument);
                 }

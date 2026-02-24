@@ -468,3 +468,31 @@ Handling for this column should be very much like the array column data types, e
 The key difference is to extend the new BSON document class from BinaryColumnDocumentBase.
 
 The integration test coverage should follow Int32ArrayColumnIT very closely, just changing the column and sample value data types as appropriate (for changing from Int32Column/int to StructColumn/byte string).  The pattern for covering the data event subscription API is the same, we musst ingest data for both a scalar trigger PV and a binary target PV (StructColumn).  Please follow the patterns as closely as you can.
+
+### 6.2 handling and integration test coverage for ImageColumn
+
+ImageColumn is defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto, and pasted below.
+
+```
+message ImageColumn {
+  string name = 1;
+  ImageDescriptor imageDescriptor = 2;
+  // One image per sample
+  repeated bytes images = 3;
+}
+
+message ImageDescriptor {
+  uint32 width = 1;
+  uint32 height = 2;
+  uint32 channels = 3; // e.g. 1 (mono), 3 (RGB)
+  string encoding = 4; // e.g. "raw", "png", "jpeg"
+}
+```
+
+This column contains an image for each sample value that is serialized to byte string format.  The ImageDescriptor.encoding is used to decipher what sort of image is encoded in each sample value.
+
+Handling for this column should be very much like the StructColumn.  We will complete the 7 steps listed in section 4.0, with the additional details described in section 6.0.
+
+The key difference is to extend the new BSON document class from BinaryColumnDocumentBase.
+
+The integration test coverage should follow StructColumn very closely, just changing the column and sample value data types as appropriate (for changing from StructColumn/struct to ImageColumn/image).  The pattern for covering the data event subscription API is the same, we musst ingest data for both a scalar trigger PV and a binary target PV (StructColumn).  Please follow the patterns as closely as you can.
