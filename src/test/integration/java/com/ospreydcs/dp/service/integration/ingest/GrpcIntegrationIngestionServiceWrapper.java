@@ -89,6 +89,22 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
     /**
      * @param providerId instance variables
      */
+    /**
+     * Helper method to safely convert a column document to DataColumn for testing purposes.
+     * Only scalar columns and DataColumnDocument can be converted to DataColumn.
+     * Returns null if the column cannot be converted (e.g., binary columns).
+     */
+    public static DataColumn tryConvertToDataColumn(ColumnDocumentBase columnDocument) throws DpException {
+        if (columnDocument instanceof ScalarColumnDocumentBase) {
+            return ((ScalarColumnDocumentBase<?>) columnDocument).toDataColumn();
+        } else if (columnDocument instanceof DataColumnDocument) {
+            return ((DataColumnDocument) columnDocument).toDataColumn();
+        } else {
+            // Binary columns cannot be converted to DataColumn
+            return null;
+        }
+    }
+
     public record IngestionBucketInfo(
             String providerId,
             String requestId,
@@ -598,7 +614,11 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                 DataColumn requestDataColumn = null;
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // For binary columns, skip DataColumn comparison as they can't be converted
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }

@@ -125,26 +125,6 @@ public class ImageColumnDocument extends BinaryColumnDocumentBase {
     }
 
     @Override
-    protected Message.Builder createColumnBuilder() {
-        // Image columns override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Image columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    protected void addAllValuesToBuilder(Message.Builder builder) {
-        // Not used by image columns - they override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Image columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    public Message toProtobufColumn() {
-        try {
-            return deserializeToProtobufColumn();
-        } catch (DpException e) {
-            throw new RuntimeException("Failed to deserialize image column", e);
-        }
-    }
-
     protected Message deserializeToProtobufColumn() throws DpException {
         ImageColumn.Builder builder = ImageColumn.newBuilder();
         

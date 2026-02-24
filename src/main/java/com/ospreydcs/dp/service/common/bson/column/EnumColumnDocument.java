@@ -50,25 +50,10 @@ public class EnumColumnDocument extends ScalarColumnDocumentBase<Integer> {
     }
 
     @Override
-    public Message toProtobufColumn() {
-        Message.Builder builder = createColumnBuilder();
-        
-        // Set name field using reflection (same as parent class)
-        try {
-            String safeName = (getName() != null) ? getName() : "";
-            builder.getClass().getMethod("setName", String.class).invoke(builder, safeName);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set name on column builder", e);
-        }
-        
-        // Add values using inherited method
-        addAllValuesToBuilder(builder);
-        
+    protected void customizeBuilder(Message.Builder builder) {
         // Add enumId field specific to EnumColumn
         if (enumId != null) {
             ((EnumColumn.Builder) builder).setEnumId(enumId);
         }
-        
-        return builder.build();
     }
 }

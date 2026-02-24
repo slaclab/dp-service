@@ -496,3 +496,35 @@ Handling for this column should be very much like the StructColumn.  We will com
 The key difference is to extend the new BSON document class from BinaryColumnDocumentBase.
 
 The integration test coverage should follow StructColumn very closely, just changing the column and sample value data types as appropriate (for changing from StructColumn/struct to ImageColumn/image).  The pattern for covering the data event subscription API is the same, we musst ingest data for both a scalar trigger PV and a binary target PV (StructColumn).  Please follow the patterns as closely as you can.
+
+7.0 Refactor BSON column document hierarchy to move methods to appropriate level of hierarchy.
+
+There is a code smell, where we have several binary column BSON classes throwing exceptions instead of providing implementations.  We need to refactor methods to be defined at the proper level of the class hierarchy.  Here are some notes from our first discussion about this:
+
+refactoring bson scalar column method notes
+● You're absolutely right! Looking at the code, I can see the design issue:
+
+Current problematic hierarchy:
+ColumnDocumentBase (has createColumnBuilder() + addAllValuesToBuilder() - WRONG LEVEL)
+├── ScalarColumnDocumentBase<T> (these methods should be here)
+│   └── DoubleColumnDocument, FloatColumnDocument, etc.
+└── BinaryColumnDocumentBase (forced to implement methods it doesn't need)
+├── ArrayColumnDocumentBase (throws UnsupportedOperationException)
+└── StructColumnDocument (throws UnsupportedOperationException)
+
+Should be:
+ColumnDocumentBase (only common methods: name, addColumnToBucket, toDataColumn)
+├── ScalarColumnDocumentBase<T> (createColumnBuilder() + addAllValuesToBuilder() HERE)
+│   └── DoubleColumnDocument, FloatColumnDocument, etc.
+└── BinaryColumnDocumentBase (has its own toProtobufColumn() approach)
+├── ArrayColumnDocumentBase (uses deserializeToProtobufColumn())
+└── StructColumnDocument (uses deserializeToProtobufColumn())
+
+The createColumnBuilder() and addAllValuesToBuilder() methods are specific to the scalar column pattern where you build a protobuf message incrementally. Binary columns use a completely different
+approach with deserializeToProtobufColumn().
+
+This is a clear architectural issue where methods specific to one branch of the hierarchy (scalar columns) are being forced on all branches. The current workaround of throwing
+UnsupportedOperationException in both ArrayColumnDocumentBase and StructColumnDocument is a code smell indicating the methods are at the wrong level.
+
+However, since this appears to be existing technical debt in the codebase, and my current task is to implement StructColumn following existing patterns, I should probably keep the current approach for
+consistency rather than refactor the entire hierarchy. The UnsupportedOperationException approach follows the established pattern used by ArrayColumnDocumentBase.

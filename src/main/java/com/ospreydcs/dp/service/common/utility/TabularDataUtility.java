@@ -2,7 +2,9 @@ package com.ospreydcs.dp.service.common.utility;
 
 import com.mongodb.client.MongoCursor;
 import com.ospreydcs.dp.grpc.v1.common.*;
+import com.ospreydcs.dp.service.common.bson.column.ColumnDocumentBase;
 import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.ScalarColumnDocumentBase;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
@@ -57,8 +59,21 @@ public class TabularDataUtility {
 
         final DataTimestamps bucketDataTimestamps = bucket.getDataTimestamps().toDataTimestamps();
 
-        // TODO: This will probably need help for the new ColumnDocumentBase hierarchy, can all the subclasses generate a DataColumn from the native representation?
-        final DataColumn bucketColumn = bucket.getDataColumn().toDataColumn();
+        // Only scalar column types and DataColumnDocument can be converted to DataColumn for tabular export
+        final ColumnDocumentBase columnDocument = bucket.getDataColumn();
+        final DataColumn bucketColumn;
+        
+        if (columnDocument instanceof ScalarColumnDocumentBase) {
+            // Scalar columns can be converted to legacy DataColumn format
+            bucketColumn = ((ScalarColumnDocumentBase<?>) columnDocument).toDataColumn();
+        } else if (columnDocument instanceof DataColumnDocument) {
+            // Legacy DataColumn documents can be converted directly
+            bucketColumn = ((DataColumnDocument) columnDocument).toDataColumn();
+        } else {
+            // Binary columns (arrays, images, structs) cannot be converted to tabular format
+            throw new DpException("Column type " + columnDocument.getClass().getSimpleName() + 
+                                " cannot be exported to tabular format (CSV/Excel/etc). Binary column types require specialized export formats.");
+        }
 
         return addColumnsToTable(
                 bucketDataTimestamps,

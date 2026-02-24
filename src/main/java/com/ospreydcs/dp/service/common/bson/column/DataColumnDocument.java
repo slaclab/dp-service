@@ -49,17 +49,17 @@ public class DataColumnDocument extends ColumnDocumentBase {
     }
 
     @Override
-    protected Message.Builder createColumnBuilder() {
-        return DataColumn.newBuilder();
-    }
-
-    @Override
-    protected void addAllValuesToBuilder(Message.Builder builder) {
-        try {
-            ((DataColumn.Builder) builder).mergeFrom(DataColumn.parseFrom(this.bytes));
-        } catch (InvalidProtocolBufferException e) {
-            logger.error("protobuf parsing error", e);
+    public Message toProtobufColumn() {
+        if (this.bytes != null) {
+            try {
+                return DataColumn.parseFrom(this.bytes);
+            } catch (InvalidProtocolBufferException e) {
+                logger.error("protobuf parsing error", e);
+                // Return empty DataColumn as fallback
+                return DataColumn.newBuilder().setName(getName() != null ? getName() : "").build();
+            }
         }
+        return DataColumn.newBuilder().setName(getName() != null ? getName() : "").build();
     }
 
     public static DataColumnDocument fromDataColumn(DataColumn requestDataColumn) {

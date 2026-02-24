@@ -20,26 +20,13 @@ public abstract class ColumnDocumentBase {
         this.name = name;
     }
 
-    protected abstract Message.Builder createColumnBuilder();
-
-    protected abstract void addAllValuesToBuilder(Message.Builder builder);
-
-    private void setBuilderName(Message.Builder builder, String name) {
-        try {
-            // Handle null names by using empty string
-            String safeName = (name != null) ? name : "";
-            builder.getClass().getMethod("setName", String.class).invoke(builder, safeName);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set name on column builder", e);
-        }
-    }
-
-    public Message toProtobufColumn() {
-        Message.Builder builder = createColumnBuilder();
-        setBuilderName(builder, this.getName());
-        addAllValuesToBuilder(builder);
-        return builder.build();
-    }
+    /**
+     * Converts this document to its corresponding protobuf column message.
+     * Each branch of the hierarchy implements this differently:
+     * - Scalar columns use incremental builder pattern
+     * - Binary columns use direct deserialization pattern
+     */
+    public abstract Message toProtobufColumn();
 
     public byte[] toByteArray() {
         return toProtobufColumn().toByteArray();
@@ -52,7 +39,4 @@ public abstract class ColumnDocumentBase {
      * @throws DpException
      */
     public abstract void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException;
-
-    // TODO: this is for the tabular query result mechanism.  It works, but may be a pain for subclasses to generate from their native data.
-    public abstract DataColumn toDataColumn() throws DpException;
 }

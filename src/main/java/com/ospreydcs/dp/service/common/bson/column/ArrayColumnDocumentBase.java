@@ -78,27 +78,7 @@ public abstract class ArrayColumnDocumentBase extends BinaryColumnDocumentBase {
     /**
      * Reads array values from binary storage and creates the appropriate protobuf column.
      * Subclasses implement this with type-specific deserialization logic.
+     * Implementation required by BinaryColumnDocumentBase.
      */
     protected abstract Message deserializeToProtobufColumn() throws DpException;
-
-    @Override
-    protected Message.Builder createColumnBuilder() {
-        // Subclasses will override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Array columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    protected void addAllValuesToBuilder(Message.Builder builder) {
-        // Not used by array columns - they override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Array columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    public Message toProtobufColumn() {
-        try {
-            return deserializeToProtobufColumn();
-        } catch (DpException e) {
-            throw new RuntimeException("Failed to deserialize array column", e);
-        }
-    }
 }

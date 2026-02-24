@@ -62,26 +62,6 @@ public class StructColumnDocument extends BinaryColumnDocumentBase {
     }
 
     @Override
-    protected Message.Builder createColumnBuilder() {
-        // Struct columns override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Struct columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    protected void addAllValuesToBuilder(Message.Builder builder) {
-        // Not used by struct columns - they override toProtobufColumn() directly
-        throw new UnsupportedOperationException("Struct columns should override toProtobufColumn() directly");
-    }
-
-    @Override
-    public Message toProtobufColumn() {
-        try {
-            return deserializeToProtobufColumn();
-        } catch (DpException e) {
-            throw new RuntimeException("Failed to deserialize struct column", e);
-        }
-    }
-
     protected Message deserializeToProtobufColumn() throws DpException {
         StructColumn.Builder builder = StructColumn.newBuilder();
         

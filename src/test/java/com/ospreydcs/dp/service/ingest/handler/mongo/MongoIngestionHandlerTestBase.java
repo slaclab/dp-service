@@ -9,6 +9,7 @@ import com.ospreydcs.dp.grpc.v1.ingestion.RegisterProviderResponse;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.mongo.MongoClientBase;
 import com.ospreydcs.dp.service.ingest.IngestionTestBase;
+import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionRequest;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionResult;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
@@ -184,9 +185,13 @@ public class MongoIngestionHandlerTestBase extends IngestionTestBase {
             // compare column data values to expected
             DataColumn dataColumn = null;
             try {
-                dataColumn = bucket.getDataColumn().toDataColumn();
+                dataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucket.getDataColumn());
+                if (dataColumn == null) {
+                    // Binary columns can't be converted to DataColumn, skip this verification
+                    return;
+                }
             } catch (DpException e) {
-                fail("exception derserializing DataColumn from BucketDocument: " + e.getMessage());
+                fail("exception deserializing DataColumn from BucketDocument: " + e.getMessage());
             }
             Objects.requireNonNull(dataColumn);
             int dataValueIndex = 0;

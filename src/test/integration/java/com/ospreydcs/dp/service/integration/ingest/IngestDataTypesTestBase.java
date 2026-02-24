@@ -178,7 +178,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }
@@ -300,7 +304,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }
@@ -514,7 +522,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }

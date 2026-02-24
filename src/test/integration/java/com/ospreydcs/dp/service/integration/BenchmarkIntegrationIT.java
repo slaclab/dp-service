@@ -8,6 +8,7 @@ import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataResponse;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataRequest;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataResponse;
 import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
+import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
 import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
@@ -201,7 +202,11 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
 
                     DataColumn bucketDataColumn = null;
                     try {
-                        bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                        bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                        if (bucketDataColumn == null) {
+                            // Binary columns can't be converted to DataColumn, skip this test
+                            continue;
+                        }
                     } catch (DpException e) {
                         throw new RuntimeException(e);
                     }

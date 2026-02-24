@@ -1,6 +1,6 @@
 package com.ospreydcs.dp.service.common.bson.column;
 
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
+import com.google.protobuf.Message;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
@@ -60,13 +60,21 @@ public abstract class BinaryColumnDocumentBase extends ColumnDocumentBase {
     }
 
     /**
-     * Most binary column types cannot be converted to legacy DataColumn format
-     * because they contain complex data structures that don't map to simple DataValue objects.
-     * Subclasses that can support this conversion should override this method.
+     * Binary columns use direct deserialization pattern for protobuf conversion.
+     * Each subclass implements its own deserialization logic.
      */
     @Override
-    public DataColumn toDataColumn() throws DpException {
-        throw new DpException("Binary column type " + this.getClass().getSimpleName() + 
-                              " cannot be converted to legacy DataColumn format");
+    public final Message toProtobufColumn() {
+        try {
+            return deserializeToProtobufColumn();
+        } catch (DpException e) {
+            throw new RuntimeException("Failed to deserialize binary column", e);
+        }
     }
+
+    /**
+     * Deserializes binary data to the appropriate protobuf column type.
+     * Each binary column type implements its own deserialization logic.
+     */
+    protected abstract Message deserializeToProtobufColumn() throws DpException;
 }
