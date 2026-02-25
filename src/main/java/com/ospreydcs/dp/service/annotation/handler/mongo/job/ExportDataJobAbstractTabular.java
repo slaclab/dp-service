@@ -143,7 +143,7 @@ public abstract class ExportDataJobAbstractTabular extends ExportDataJobBase {
                             endNanos
                     );
                 } catch (DpException e) {
-                    final String errorMsg = "exception deserializing BucketDocument fields: " + e.getMessage();
+                    final String errorMsg = "exception building tabular result: " + e.getMessage();
                     logger.error("id: {}, error: {}", this.handlerRequest.responseObserver.hashCode(), errorMsg);
                     return new ExportDataStatus(true, errorMsg);
                 }
