@@ -234,6 +234,9 @@ public class BucketDocument extends DpBsonDocumentBase {
 
         final DataBucket.Builder bucketBuilder = DataBucket.newBuilder();
 
+        // set name
+        bucketBuilder.setPvName(document.getPvName());
+
         // add data timestamps
         DataTimestamps dataTimestamps = document.getDataTimestamps().toDataTimestamps();
         bucketBuilder.setDataTimestamps(dataTimestamps);
