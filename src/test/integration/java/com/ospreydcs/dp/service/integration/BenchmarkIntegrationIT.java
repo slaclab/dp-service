@@ -559,7 +559,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseCursor scenario completed ==========");
@@ -586,7 +586,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseStream scenario completed ==========");
@@ -613,7 +613,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_SINGLE_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseSingle scenario completed ==========");

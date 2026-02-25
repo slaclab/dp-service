@@ -287,68 +287,6 @@ In Data Platform version 1.4, the polymorphic "BucketDocument" hierarchy shown a
 
 ![bucket document standalone](images/uml-dp-bucket-document-standalone.png "bucket document standalone")
 
-### using SerializedDataColumns for improved API performance
-
-As of version 1.9, a mechanism is added for using "SerializedDataColumns" in the API methods for data ingestion, query, and subscription for improved performance.
-
-This is made possible by the change to storing the byte data representation of its DataColumn in MongoDB BucketDocuments, as we no longer need access to the individual DataValues in a protobuf DataColumn during ingestion.
-
-The APIs for data ingestion, query, and subscription now include an option for sending SerializedDataColumns instead of regular DataColumns.  Using this mechanism improves performance significantly by avoiding redundant serialization and deserialization operations performed by the gRPC communication framework.  
-
-Sending regular DataColumns in ingestion requests requires 3 serialization operations.  The client performs serialization when sending the request; the server performs deserialization when receiving the request, and then the data are re-serialized for compact storage in MongoDB.  Sending SerializedDataColumns in ingestion requests requires a single serialization operation in the client with no deserialization or re-serialization required in the server before storage in MongoDB.  This results in ingestion performance improvements of 2-3x.  Similar improvements are made in the query and subscription APIs.
-
-The ingestion API method variants ingestData(), ingestDataStream(), and ingestDataBidiStream() are modified to include a new optional list of SerializedDataColumns in the request's IngestionDataFrame object.  The API client can send either a list of regular DataColumns, SerializedDataColumns, or both.  Clients seeking maximum performance should send SerializedDataColumns, by manually serializing each DataColumn to its ByteString representation for use in the API request.
-
-The query API method variants queryData(), queryDataStream(), and queryDataBidiStream() are modified in a similar fashion.  The request's QuerySpec now includes a flag "useSerializedDataColumns" that is set to indicate that the client wishes to receive SerializedDataColumns in the query result instead of regular ones.  When the flag is set, the response's DataBuckets contain a SerializedDataColumn instead of a regular one.  Clients seeking maximum performance should set the flag in the query request, and must manually deserialize each DataBucket's serializedDataColumn by parsing a DataColumn from the SerializedDataColumn's "dataColumnBytes" byte representation of the column.
-
-When ingestion requests utilize SerializedDataColumns for improved performance, corresponding notifications sent by the subscribeData() API for subscribed PVs will automatically use SerializedDataColumns for maximum performance in subscription communication.
-
-These changes are all made to be backward compatible, so that existing API clients continue to work without modification.
-
-New ingestion and query performance benchmark applications are added including BenchmarkIngestDataStreamBytes and BenchmarkQueryDataStreamBytes, respectively.
-
-Below is a Java code snippet showing how to convert a list of regular DataColumns to a list of SerializedDataColumns for use in an IngestDataRequest's IngestionDataFrame.
-```
-// build a list of DataColumns
-final List<DataColumn> frameColumns = new ArrayList<>();
-
-// create a DataColumn object
-DataColumn.Builder dataColumnBuilder = DataColumn.newBuilder();
-dataColumnBuilder.setName("S01-GCC01");
-
-// add a DataValue to the column
-DataValue.Builder dataValueBuilder = DataValue.newBuilder().setDoubleValue(12.34);
-dataColumnBuilder.addDataValues(dataValueBuilder.build());
-
-// add DataColumn to list
-frameColumns.add(dataColumnBuilder.build());
-
-// generate a list of SerializedDataColumn objects from list of DataColumn objects, and add them to IngesitonDataFrame
-IngestDataRequest.IngestionDataFrame.Builder dataFrameBuilder
-        = IngestDataRequest.IngestionDataFrame.newBuilder();
-for (DataColumn dataColumn : frameColumns) {
-    final SerializedDataColumn serializedDataColumn =
-            SerializedDataColumn.newBuilder()
-                    .setName(dataColumn.getName())
-                    .setDataColumnBytes(dataColumn.toByteString())
-                    .build();
-    dataFrameBuilder.addSerializedDataColumns(serializedDataColumn);
-```
-
-
-Below is a Java code snippet showing how to convert a SerializedDataColumn in the query result DataBucket to a regular DataColumn for accessing its name and data values.
-```
-if (responseBucket.hasSerializedDataColumn()) {
-    DataColumn responseDataColumn = null;
-    try {
-        responseDataColumn = DataColumn.parseFrom(responseBucket.getSerializedDataColumn().getDataColumnBytes());
-    } catch (InvalidProtocolBufferException e) {
-        fail("exception parsing DataColumn from SerializedDataColumn: " + e.getMessage());
-    }
-}
-```
-
-
 ### data subscription framework
 
 As of v1.7, the Ingestion Service provides a mechanism for subscribing to new data received in the ingestion stream, via the subscribeData() API method.  Key components involved in the data subscription handling framework are described in more detail below.
