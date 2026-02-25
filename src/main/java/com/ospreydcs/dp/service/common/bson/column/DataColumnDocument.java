@@ -74,14 +74,6 @@ public class DataColumnDocument extends ColumnDocumentBase {
         return document;
     }
 
-    public static DataColumnDocument fromSerializedDataColumn(
-            SerializedDataColumn column
-    ) {
-        DataColumnDocument document = new DataColumnDocument();
-        document.setName(column.getName());
-        document.setBytes(column.getPayload().toByteArray());
-        return document;
-    }
 
     public DataColumn toDataColumn() throws DpException {
 

@@ -115,7 +115,8 @@ public abstract class MongoClientBase {
                 BoolArrayColumnDocument.class,
                 StructColumnDocument.class,
                 ImageColumnDocument.class,
-                ImageColumnDocument.ImageDescriptorDocument.class
+                ImageColumnDocument.ImageDescriptorDocument.class,
+                SerializedDataColumnDocument.class
         ).build();
 
         //        CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();

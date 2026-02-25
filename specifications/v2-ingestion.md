@@ -497,7 +497,7 @@ The key difference is to extend the new BSON document class from BinaryColumnDoc
 
 The integration test coverage should follow StructColumn very closely, just changing the column and sample value data types as appropriate (for changing from StructColumn/struct to ImageColumn/image).  The pattern for covering the data event subscription API is the same, we musst ingest data for both a scalar trigger PV and a binary target PV (StructColumn).  Please follow the patterns as closely as you can.
 
-7.0 Refactor BSON column document hierarchy to move methods to appropriate level of hierarchy.
+### 7.0 Refactor BSON column document hierarchy to move methods to appropriate level of hierarchy.
 
 There is a code smell, where we have several binary column BSON classes throwing exceptions instead of providing implementations.  We need to refactor methods to be defined at the proper level of the class hierarchy.  Here are some notes from our first discussion about this:
 
@@ -528,3 +528,13 @@ UnsupportedOperationException in both ArrayColumnDocumentBase and StructColumnDo
 
 However, since this appears to be existing technical debt in the codebase, and my current task is to implement StructColumn following existing patterns, I should probably keep the current approach for
 consistency rather than refactor the entire hierarchy. The UnsupportedOperationException approach follows the established pattern used by ArrayColumnDocumentBase.
+
+### 8.0 SerializedDataColumn handling and integration test coverage
+
+SerializedDataColumn was defined in protobuf before we added the new column data types.  The idea from the original implementation is still pretty much the same.  It was intended to allow the client to send binary data through the API end to end from ingestion to query to subscription, so that we never deserialize the data.  It was hardwired to handle only a DataColumn payload.  These messages are defined in ~/dp.fork/dp-java/dp-grpc/src/main/proto/common.proto.
+
+We introduced the new "column-oriented" protobuf data types in v2 primarily to avoid the memory allocation issues with ingesting data in DataColumn messages, that is, per-sample memory allocation for each DataValue in the column.
+
+As you know, some of the columns are implemented using binary storage, by extending BinaryColumnDocumentBase.  The plan is to review the existing handling for SerializedDataColumn to bring it more inline with the other new binary column data types, like StructColumn and ImageColumn.
+
+Please review the existing code and identify a plan to move SerializedDataColumn to the BinaryColumnDocumentBase hierarchy and make all the handling consistent with the other new column data types, e.g., relative to the 7 step plan established in task 4.0 of this document.

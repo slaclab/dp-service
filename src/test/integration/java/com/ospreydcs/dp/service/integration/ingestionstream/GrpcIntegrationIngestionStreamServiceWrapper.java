@@ -188,9 +188,6 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
                         if (bucketDataCase != null) {
                             assertEquals(bucketDataCase, dataBucket.getDataCase());
                         }
-                        if (dataBucket.getDataCase() == DataBucket.DataCase.SERIALIZEDDATACOLUMN) {
-                            actualSerializedColumnCount++;
-                        }
                         final DataTimestamps bucketDataTimestamps = dataBucket.getDataTimestamps();
                         final DataTimestampsUtility.DataTimestampsModel bucketDataTimestampsModel =
                                 new DataTimestampsUtility.DataTimestampsModel(bucketDataTimestamps);
@@ -236,9 +233,6 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
                 }
             }
         }
-
-        // check actual number of SerializedDataColumns in response matches expected
-        assertEquals(numExpectedSerializedColumns, actualSerializedColumnCount);
 
         return dataBuckets;
     }

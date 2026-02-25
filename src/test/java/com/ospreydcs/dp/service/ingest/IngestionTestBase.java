@@ -82,6 +82,7 @@ public class IngestionTestBase {
         private List<BoolArrayColumn> boolArrayColumnList = null;
         private List<StructColumn> structColumnList = null;
         private List<ImageColumn> imageColumnList = null;
+        private List<SerializedDataColumn> serializedDataColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
@@ -277,6 +278,14 @@ public class IngestionTestBase {
 
         public void setImageColumnList(List<ImageColumn> imageColumnList) {
             this.imageColumnList = imageColumnList;
+        }
+
+        public void setSerializedDataColumnList(List<SerializedDataColumn> serializedDataColumnList) {
+            this.serializedDataColumnList = serializedDataColumnList;
+        }
+
+        public List<SerializedDataColumn> serializedDataColumnList() {
+            return serializedDataColumnList;
         }
 
         public List<FloatColumn> floatColumnList() {
@@ -568,6 +577,11 @@ public class IngestionTestBase {
         if (params.imageColumnList() != null) {
             // use list of ImageColumns provided by caller
             dataFrameBuilder.addAllImageColumns(params.imageColumnList());
+        }
+
+        if (params.serializedDataColumnList() != null) {
+            // use list of SerializedDataColumns provided by caller
+            dataFrameBuilder.addAllSerializedDataColumns(params.serializedDataColumnList());
         }
 
         dataFrameBuilder.build();

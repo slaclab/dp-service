@@ -136,7 +136,7 @@ public class BucketDocument extends DpBsonDocumentBase {
 
         // create BucketDocument for each SerializedDataColumn
         for (SerializedDataColumn column : request.getIngestionDataFrame().getSerializedDataColumnsList()) {
-            ColumnDocumentBase columnDocument = DataColumnDocument.fromSerializedDataColumn(column);
+            ColumnDocumentBase columnDocument = SerializedDataColumnDocument.fromSerializedDataColumn(column);
             bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 
