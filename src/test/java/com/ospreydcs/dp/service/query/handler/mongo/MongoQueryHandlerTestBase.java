@@ -261,7 +261,7 @@ public class MongoQueryHandlerTestBase extends QueryTestBase {
                 startSeconds,
                 0L,
                 startSeconds + 5,
-                0L, false);
+                0L);
         QueryDataRequest request = buildQueryDataRequest(params);
 
         // execute query and dispatch result using ResponseStreamDispatcher
@@ -280,7 +280,7 @@ public class MongoQueryHandlerTestBase extends QueryTestBase {
                 startSeconds,
                 0L,
                 startSeconds + 5,
-                0L, false);
+                0L);
         QueryDataRequest request = buildQueryDataRequest(params);
 
         // execute query and dispatch using ResponseCursorDispatcher

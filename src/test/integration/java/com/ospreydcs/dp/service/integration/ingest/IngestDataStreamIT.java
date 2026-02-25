@@ -57,7 +57,7 @@ public class IngestDataStreamIT extends GrpcIntegrationTestBase {
                                 IngestionTestBase.IngestionDataType.DOUBLE,
                                 values,
                                 null,
-                                false, null);
+                                null);
                 final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
                 paramsList.add(params);
                 requestList.add(request);
@@ -83,14 +83,14 @@ public class IngestDataStreamIT extends GrpcIntegrationTestBase {
                                 IngestionTestBase.IngestionDataType.DOUBLE,
                                 values,
                                 null,
-                                false, null);
+                                null);
                 final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
                 paramsList.add(params);
                 requestList.add(request);
             }
 
             // send request and examine response
-            ingestionServiceWrapper.sendAndVerifyIngestDataStream(paramsList, requestList, 0, false, "");
+            ingestionServiceWrapper.sendAndVerifyIngestDataStream(paramsList, requestList, false, "");
         }
 
         // negative test case, rejection
@@ -117,7 +117,7 @@ public class IngestDataStreamIT extends GrpcIntegrationTestBase {
                                 1,
                                 columnNames,
                                 IngestionTestBase.IngestionDataType.DOUBLE,
-                                values, null, false, null);
+                                values, null, null);
                 final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
                 paramsList.add(params);
                 requestList.add(request);
@@ -141,7 +141,7 @@ public class IngestDataStreamIT extends GrpcIntegrationTestBase {
                                 1,
                                 columnNames,
                                 IngestionTestBase.IngestionDataType.DOUBLE,
-                                values, null, false, null);
+                                values, null, null);
                 final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
                 paramsList.add(params);
                 requestList.add(request);
@@ -149,7 +149,7 @@ public class IngestDataStreamIT extends GrpcIntegrationTestBase {
 
             // send request and examine response
             ingestionServiceWrapper.sendAndVerifyIngestDataStream(
-                    paramsList, requestList, 0, true, "one or more requests were rejected");
+                    paramsList, requestList, true, "one or more requests were rejected");
         }
     }
 

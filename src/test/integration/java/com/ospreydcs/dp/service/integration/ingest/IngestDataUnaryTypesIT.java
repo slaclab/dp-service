@@ -17,7 +17,7 @@ public class IngestDataUnaryTypesIT extends IngestDataTypesTestBase {
             IngestionTestBase.IngestionRequestParams params,
             IngestDataRequest ingestionRequest
     ) {
-        return ingestionServiceWrapper.sendAndVerifyIngestData(params, ingestionRequest, 0);
+        return ingestionServiceWrapper.sendAndVerifyIngestData(params, ingestionRequest);
     }
 
     @Before

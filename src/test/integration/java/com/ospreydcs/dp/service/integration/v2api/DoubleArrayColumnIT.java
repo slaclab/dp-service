@@ -1,29 +1,21 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
-import com.ospreydcs.dp.grpc.v1.annotation.ExportDataRequest;
-import com.ospreydcs.dp.grpc.v1.annotation.ExportDataResponse;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.SubscribeDataEventResponse;
-import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
 import com.ospreydcs.dp.service.ingest.IngestionTestBase;
 import com.ospreydcs.dp.service.ingest.utility.SubscribeDataUtility;
 import com.ospreydcs.dp.service.ingestionstream.IngestionStreamTestBase;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationTestBase;
 import com.ospreydcs.dp.service.query.QueryTestBase;
-import de.siegmar.fastcsv.reader.CsvReader;
-import de.siegmar.fastcsv.reader.CsvRecord;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 
@@ -141,7 +133,6 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             initialIngestionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -150,7 +141,7 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(initialIngestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request);
         }
 
         // positive queryData() test case for array column
@@ -171,8 +162,7 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -327,7 +317,6 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -336,7 +325,7 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request);
         }
 
         // check that expected subscribeData() response is received for array PV
@@ -364,7 +353,6 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.DOUBLEARRAYCOLUMN);
         assertEquals(1, responseDataBuckets.size());
         assertTrue("Event response bucket should contain DoubleArrayColumn", responseDataBuckets.get(0).hasDoubleArrayColumn());

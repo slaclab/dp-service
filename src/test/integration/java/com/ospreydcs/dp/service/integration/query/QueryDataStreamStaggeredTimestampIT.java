@@ -65,7 +65,6 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
                             numBucketsTenths,
                             numSecondsPerBucketTenths, 
                             false,
-                            false,
                             null,
                             null,
                             null,
@@ -90,7 +89,6 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
                             intervalFifths,
                             numBucketsFifths,
                             numSecondsPerBucketFifths,
-                            false,
                             false,
                             null,
                             null,
@@ -117,7 +115,6 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
                             numBucketsQuarters,
                             numSecondsPerBucketQuarters, 
                             false,
-                            false,
                             null,
                             null,
                             null,
@@ -143,7 +140,6 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
                             numBucketsEighths,
                             numSecondsPerBucketEighths,
                             true,
-                            false,
                             null,
                             null,
                             null,
@@ -158,7 +154,7 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
         {
             // perform ingestion for specified list of columns
             validationMap = ingestionServiceWrapper.ingestDataBidiStreamFromColumn(
-                    columnInfoList, startSeconds, startNanos, 0);
+                    columnInfoList, startSeconds, startNanos);
         }
 
         {
@@ -206,13 +202,11 @@ public class QueryDataStreamStaggeredTimestampIT extends GrpcIntegrationTestBase
                     queryStartSecondsBucket,
                     queryStartNanosBucket,
                     queryEndSecondsBucket,
-                    queryEndNanosBucket,
-                    false
+                    queryEndNanosBucket
             );
 
             queryServiceWrapper.sendAndVerifyQueryDataStream(
                     numBucketsExpected,
-                    0,
                     params,
                     validationMap,
                     false,

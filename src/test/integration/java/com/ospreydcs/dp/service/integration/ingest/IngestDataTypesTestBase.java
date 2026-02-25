@@ -156,7 +156,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             arrayDataColumnList
                     );
 
@@ -215,8 +214,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(
                     queryDataRequestParams, false, "");
@@ -282,7 +280,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             dataColumnList
                     );
 
@@ -336,8 +333,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(
@@ -500,7 +496,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             dataColumnList
                     );
 
@@ -638,8 +633,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(

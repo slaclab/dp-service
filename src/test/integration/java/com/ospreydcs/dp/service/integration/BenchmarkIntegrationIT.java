@@ -764,13 +764,12 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             queryServiceWrapper.sendAndVerifyQueryData(
                     numBucketsExpected,
-                    0, params,
+                    params,
                     null,
                     expectReject,
                     expectedRejectMessage

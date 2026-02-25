@@ -131,7 +131,6 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             initialIngestionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -140,7 +139,7 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(initialIngestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request);
         }
 
         // positive queryData() test case for array column
@@ -161,8 +160,7 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -317,7 +315,6 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -326,7 +323,7 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request);
         }
 
         // check that expected subscribeData() response is received for array PV
@@ -354,7 +351,6 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.FLOATARRAYCOLUMN);
         assertEquals(1, responseDataBuckets.size());
         assertTrue("Event response bucket should contain FloatArrayColumn", responseDataBuckets.get(0).hasFloatArrayColumn());

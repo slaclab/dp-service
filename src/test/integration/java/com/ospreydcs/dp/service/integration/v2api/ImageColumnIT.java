@@ -133,7 +133,6 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             initialIngestionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -142,7 +141,7 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(initialIngestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request);
         }
 
         // positive queryData() test case for image column
@@ -163,8 +162,7 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -319,7 +317,6 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column with trigger value
@@ -328,7 +325,7 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request);
         }
 
         // check that expected subscribeData() response is received for image PV
@@ -365,7 +362,6 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.IMAGECOLUMN
         );
 

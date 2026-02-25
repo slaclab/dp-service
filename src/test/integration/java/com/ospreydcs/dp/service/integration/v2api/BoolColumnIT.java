@@ -88,13 +88,12 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
                             IngestionTestBase.IngestionDataType.DOUBLE,
                             null,
                             null,
-                            false,
                             null);
             params.setBoolColumnList(boolColumns);
 
             // build and send ingestion request
             IngestDataRequest ingestionRequest = IngestionTestBase.buildIngestionRequest(params);
-            ingestionServiceWrapper.sendAndVerifyIngestData(params, ingestionRequest, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(params, ingestionRequest);
         }
 
         // positive queryData() test case
@@ -115,8 +114,7 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -244,7 +242,6 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setBoolColumnList(boolColumns);
@@ -252,7 +249,7 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest subscriptionRequest =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, subscriptionRequest, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, subscriptionRequest);
         }
 
         // check that expected subscribeData() response is received
@@ -280,7 +277,6 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.BOOLCOLUMN);
         assertEquals(1, responseDataBuckets.size());
         assertEquals(subscriptionColumn, responseDataBuckets.get(0).getBoolColumn());

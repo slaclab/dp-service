@@ -36,8 +36,7 @@ public class QueryTestBase {
             Long beginTimeSeconds,
             Long beginTimeNanos,
             Long endTimeSeconds,
-            Long endTimeNanos,
-            boolean useSerializedDataColumns
+            Long endTimeNanos
     ) {
     }
 
@@ -104,9 +103,6 @@ public class QueryTestBase {
             endTimeBuilder.build();
             querySpecBuilder.setEndTime(endTimeBuilder);
         }
-
-        // specify whether to use SerializedDataColumns or regular DataColumns
-//        querySpecBuilder.setUseSerializedDataColumns(params.useSerializedDataColumns);
 
         querySpecBuilder.build();
         requestBuilder.setQuerySpec(querySpecBuilder);

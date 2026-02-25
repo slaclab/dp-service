@@ -208,8 +208,7 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                                             queryBeginSeconds,
                                             queryBeginNanos,
                                             queryEndSeconds,
-                                            queryEndNanos,
-                                            false
+                                            queryEndNanos
                                     );
 
                             final List<DataBucket> queryResultBuckets =

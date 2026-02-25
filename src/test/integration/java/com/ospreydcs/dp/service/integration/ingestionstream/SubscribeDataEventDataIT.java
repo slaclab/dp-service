@@ -332,7 +332,6 @@ public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall1.responseObserver(),
                 expectedEventResponses1,
                 expectedEventDataResponses1,
-                0,
                 null);
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall1);
 
@@ -341,7 +340,6 @@ public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall2.responseObserver(),
                 expectedEventResponses2,
                 expectedEventDataResponses2,
-                0,
                 null);
         ingestionStreamServiceWrapper.cancelSubscribeDataEventCall(subscribeDataEventCall2);
 
@@ -350,7 +348,6 @@ public class SubscribeDataEventDataIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall3.responseObserver(),
                 expectedEventResponses3,
                 expectedEventDataResponses3,
-                0,
                 null);
 //        subscribeDataEventCall3.requestObserver().onCompleted();
 

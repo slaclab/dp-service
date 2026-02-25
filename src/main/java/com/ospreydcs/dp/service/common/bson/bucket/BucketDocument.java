@@ -239,13 +239,6 @@ public class BucketDocument extends DpBsonDocumentBase {
         bucketBuilder.setDataTimestamps(dataTimestamps);
 
         // add data values
-//        if (querySpec.getUseSerializedDataColumns()) {
-//            SerializedDataColumn serializedDataColumn = document.getDataColumn().toSerializedDataColumn();
-//            bucketBuilder.setSerializedDataColumn(serializedDataColumn);
-//        } else {
-//            DataColumn dataColumn = document.getDataColumn().toDataColumn();
-//            bucketBuilder.setDataColumn(dataColumn);
-//        }
         document.getDataColumn().addColumnToBucket(bucketBuilder);
 
         // add provider details

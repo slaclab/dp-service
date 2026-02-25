@@ -84,7 +84,7 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                                     numBuckets,
                                     numSecondsPerBucket,
                                     false,
-                                    true,  // using SerializedDataColumns
+                                    // using SerializedDataColumns
                                     null,
                                     null,
                                     null,
@@ -111,7 +111,7 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                                     numBuckets,
                                     numSecondsPerBucket,
                                     false,
-                                    true, // using SerializedDataColumns
+                                    // using SerializedDataColumns
                                     null,
                                     null,
                                     null,
@@ -128,8 +128,8 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                 return ingestionServiceWrapper.ingestDataBidiStreamFromColumn(
                         ingestionColumnInfoList,
                         startSeconds,
-                        startNanos,
-                        1);
+                        startNanos
+                );
             }
         }
     }

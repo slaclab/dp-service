@@ -117,7 +117,6 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             initialIngestionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -126,7 +125,7 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(initialIngestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request);
         }
 
         // positive queryData() test case for serialized data column
@@ -147,8 +146,7 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -286,14 +284,13 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             triggerIngestionRequestParams.setDoubleColumnList(triggerDoubleColumns);
             triggerIngestionRequestParams.setSerializedDataColumnList(triggerSerializedColumns);
 
             final IngestDataRequest triggerRequest = IngestionTestBase.buildIngestionRequest(triggerIngestionRequestParams);
-            ingestionServiceWrapper.sendAndVerifyIngestData(triggerIngestionRequestParams, triggerRequest, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(triggerIngestionRequestParams, triggerRequest);
         }
 
         // check that expected subscribeData() response is received for serialized data PV
@@ -319,7 +316,6 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.SERIALIZEDDATACOLUMN
         );
 

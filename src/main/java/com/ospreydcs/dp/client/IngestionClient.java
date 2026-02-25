@@ -164,7 +164,6 @@ public class IngestionClient extends ServiceApiClientBase {
         public IngestionDataType dataType = null;
         public List<List<Object>> values = null;
         public List<List<DataValue.ValueStatus>> valuesStatus = null;
-        public Boolean useSerializedDataColumns = false;
 
         public IngestionRequestParams(
                 String providerId,
@@ -187,8 +186,7 @@ public class IngestionClient extends ServiceApiClientBase {
                 Integer samplingClockCount,
                 List<String> columnNames,
                 IngestionDataType dataType,
-                List<List<Object>> values,
-                boolean useSerializedDataColumns
+                List<List<Object>> values
         ) {
             this(providerId, requestId);
 
@@ -204,7 +202,6 @@ public class IngestionClient extends ServiceApiClientBase {
             this.dataType = dataType;
             this.values = values;
             this.valuesStatus = valuesStatus;
-            this.useSerializedDataColumns = useSerializedDataColumns;
         }
     }
 
@@ -467,23 +464,8 @@ public class IngestionClient extends ServiceApiClientBase {
                 frameColumns.add(dataColumnBuilder.build());
             }
         }
-
-        // add DataColumns or SerializedDataColumns
-        if (params.useSerializedDataColumns) {
-            // add SerializedDataColumns as specified in params
-            for (DataColumn dataColumn : frameColumns) {
-                final SerializedDataColumn serializedDataColumn =
-                        SerializedDataColumn.newBuilder()
-                                .setName(dataColumn.getName())
-                                .setPayload(dataColumn.toByteString())
-                                .build();
-                dataFrameBuilder.addSerializedDataColumns(serializedDataColumn);
-            }
-
-        } else {
-            // add regular DataColumns
-            dataFrameBuilder.addAllDataColumns(frameColumns);
-        }
+        // add regular DataColumns
+        dataFrameBuilder.addAllDataColumns(frameColumns);
 
         dataFrameBuilder.build();
         requestBuilder.setIngestionDataFrame(dataFrameBuilder);

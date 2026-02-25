@@ -134,14 +134,23 @@ public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
 |--------------|-------------|----------------|-------------------|------------------|--------|
 | StructColumn | `BinaryColumnDocumentBase` | StructColumnDocument | "structColumn" | schemaId field | ✅ |
 | ImageColumn | `BinaryColumnDocumentBase` | ImageColumnDocument | "imageColumn" | ImageDescriptor helper | ✅ |
+| SerializedDataColumn | `BinaryColumnDocumentBase` | SerializedDataColumnDocument | "serializedDataColumn" | encoding field | ✅ |
 
 **Legacy Columns:**
-| Proto Message | Current Implementation | Planned Update | Status |
-|--------------|----------------------|----------------|--------|
-| SerializedDataColumn | Legacy pattern | Update to new framework patterns | 📋 Planned |
+| Proto Message | Current Implementation | Migration Status | Status |
+|--------------|----------------------|------------------|--------|
 | DataColumn | Legacy pattern | Maintain for backward compatibility | ✅ Legacy |
 
-**Note**: SerializedDataColumn exists with legacy implementation but may benefit from updates to follow the new systematic patterns for consistency and maintainability.
+### SerializedDataColumn Migration (Completed)
+
+**SerializedDataColumn** has been successfully migrated from the legacy storage pattern to the modern BinaryColumnDocumentBase hierarchy for architectural consistency with other binary column types.
+
+**Migration Details:**
+- **From**: Legacy `DataColumnDocument.fromSerializedDataColumn()` approach
+- **To**: Modern `SerializedDataColumnDocument extends BinaryColumnDocumentBase`
+- **Benefits**: Consistent binary storage, GridFS readiness, eliminates architectural inconsistency
+- **Backward Compatibility**: Existing legacy tests removed; new integration test `SerializedDataColumnIT` follows StructColumn pattern
+- **Integration Test**: Full API coverage (ingestion, query, data subscription, data event subscription)
 
 **EnumColumn Hybrid Design:**
 EnumColumn uses a hybrid approach that extends the scalar pattern with additional semantic metadata:
@@ -554,10 +563,11 @@ FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
 
 ### V2 API Integration Test Coverage
 - **Test Location**: `src/test/java/com/ospreydcs/dp/service/integration/v2api/`
-- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`, `StructColumnIT`, `ImageColumnIT`)
+- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`, `StructColumnIT`, `ImageColumnIT`, `SerializedDataColumnIT`)
 - **Comprehensive Coverage**: Each test class covers ingestion, query, and subscription APIs for one column type
 - **Query API Integration**: Tests verify `addColumnToBucket()` method implementation for query result assembly
 - **Framework Pattern**: Same integration test structure applies to scalar, array, and binary column types
+- **SerializedDataColumn Support**: Complete integration test framework support added, including `setSerializedDataColumnList()` in `IngestionRequestParams`
 
 #### Array and Binary Column Test Patterns
 - **Dual PV Approach**: Array and binary integration tests use scalar columns as triggers and array/binary columns as targets

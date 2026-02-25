@@ -60,9 +60,6 @@ public class IngestionTestBase {
         private final List<List<Object>> values;
         private final List<List<DataValue.ValueStatus>> valuesStatus;
 
-        // specifies to use SerializedDataColumns instead of regular DataColumns in the request
-        private final boolean useSerializedDataColumns;
-
         // explicit list of prebuilt DataColumns, instead of construcint them from the dataType / values fields
         private final List<DataColumn> dataColumnList;
 
@@ -97,7 +94,6 @@ public class IngestionTestBase {
                 IngestionDataType dataType,
                 List<List<Object>> values,
                 List<List<DataValue.ValueStatus>> valuesStatus,
-                boolean useSerializedDataColumns,
                 List<DataColumn> dataColumnList
         ) {
             this.providerId = providerId;
@@ -112,7 +108,6 @@ public class IngestionTestBase {
             this.dataType = dataType;
             this.values = values;
             this.valuesStatus = valuesStatus;
-            this.useSerializedDataColumns = useSerializedDataColumns;
             this.dataColumnList = dataColumnList;
         }
 
@@ -162,10 +157,6 @@ public class IngestionTestBase {
 
         public List<List<DataValue.ValueStatus>> valuesStatus() {
             return valuesStatus;
-        }
-
-        public boolean useSerializedDataColumns() {
-            return useSerializedDataColumns;
         }
 
         public List<DataColumn> dataColumnList() {
@@ -309,7 +300,6 @@ public class IngestionTestBase {
                     Objects.equals(this.dataType, that.dataType) &&
                     Objects.equals(this.values, that.values) &&
                     Objects.equals(this.valuesStatus, that.valuesStatus) &&
-                    this.useSerializedDataColumns == that.useSerializedDataColumns &&
                     Objects.equals(this.dataColumnList, that.dataColumnList) &&
                     Objects.equals(this.doubleColumnList, that.doubleColumnList) &&
                     Objects.equals(this.floatColumnList, that.floatColumnList);
@@ -317,7 +307,22 @@ public class IngestionTestBase {
 
         @Override
         public int hashCode() {
-            return Objects.hash(providerId, requestId, timestampsSecondsList, timestampNanosList, samplingClockStartSeconds, samplingClockStartNanos, samplingClockPeriodNanos, samplingClockCount, columnNames, dataType, values, valuesStatus, useSerializedDataColumns, dataColumnList, doubleColumnList, floatColumnList);
+            return Objects.hash(
+                    providerId,
+                    requestId,
+                    timestampsSecondsList,
+                    timestampNanosList,
+                    samplingClockStartSeconds,
+                    samplingClockStartNanos,
+                    samplingClockPeriodNanos,
+                    samplingClockCount,
+                    columnNames,
+                    dataType,
+                    values,
+                    valuesStatus,
+                    dataColumnList,
+                    doubleColumnList,
+                    floatColumnList);
         }
 
         @Override
@@ -335,7 +340,6 @@ public class IngestionTestBase {
                     "dataType=" + dataType + ", " +
                     "values=" + values + ", " +
                     "valuesStatus=" + valuesStatus + ", " +
-                    "useSerializedDataColumns=" + useSerializedDataColumns + ", " +
                     "dataColumnList=" + dataColumnList + ", " +
                     "doubleColumnList=" + doubleColumnList + ", " +
                     "floatColumnList=" + floatColumnList + ']';
@@ -488,24 +492,8 @@ public class IngestionTestBase {
                 frameColumns.add(dataColumnBuilder.build());
             }
         }
-
-        // Determine whether to add DataColumns or SerializedDataColumns
-        if (params.useSerializedDataColumns) {
-            // add SerializedDataColumns as specified in params
-            for (DataColumn dataColumn : frameColumns) {
-                final SerializedDataColumn serializedDataColumn =
-                        SerializedDataColumn.newBuilder()
-                                .setName(dataColumn.getName())
-                                .setEncoding("proto:DataColumn")
-                                .setPayload(dataColumn.toByteString())
-                                .build();
-                dataFrameBuilder.addSerializedDataColumns(serializedDataColumn);
-            }
-
-        } else {
-            // add regular DataColumns
-            dataFrameBuilder.addAllDataColumns(frameColumns);
-        }
+        // add regular DataColumns
+        dataFrameBuilder.addAllDataColumns(frameColumns);
 
         // pass through lists of data columns for various supported protobuf column types to request
 

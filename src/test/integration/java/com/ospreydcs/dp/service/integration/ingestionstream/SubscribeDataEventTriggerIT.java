@@ -326,19 +326,19 @@ public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
             // request 1: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
-                    expectedEventResponses1, null, 0, null);
+                    expectedEventResponses1, null, null);
             subscribeDataEventCall.requestObserver().onCompleted();
 
             // request 2: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall2.responseObserver(),
-                    expectedEventResponses2, null, 0, null);
+                    expectedEventResponses2, null, null);
             subscribeDataEventCall2.requestObserver().onCompleted();
 
             // request 3: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall3.responseObserver(),
-                    expectedEventResponses3, null, 0, null);
+                    expectedEventResponses3, null, null);
             subscribeDataEventCall3.requestObserver().onCompleted();
         }
     }

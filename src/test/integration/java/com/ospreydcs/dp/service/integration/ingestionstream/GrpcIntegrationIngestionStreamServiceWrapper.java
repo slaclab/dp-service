@@ -146,7 +146,6 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
             IngestionStreamTestBase.SubscribeDataEventResponseObserver responseObserver,
             Map<PvConditionTrigger, List<SubscribeDataEventResponse.Event>> expectedEventResponses,
             Map<SubscribeDataEventResponse.Event, Map<String, List<Instant>>> expectedEventDataResponses,
-            int numExpectedSerializedColumns,
             DataBucket.DataCase bucketDataCase
     ) {
         // wait for completion of API method response stream and confirm not in error state

@@ -57,7 +57,7 @@ public class IngestDataUnaryIT extends GrpcIntegrationTestBase {
                             columnNames,
                             IngestionTestBase.IngestionDataType.DOUBLE,
                             values,
-                            null, false, null);
+                            null, null);
             final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
 
             // send request and examine response
@@ -95,11 +95,11 @@ public class IngestDataUnaryIT extends GrpcIntegrationTestBase {
                             columnNames,
                             IngestionTestBase.IngestionDataType.DOUBLE,
                             values,
-                            null, false, null);
+                            null, null);
             final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
 
             // send request and examine response
-            ingestionServiceWrapper.sendAndVerifyIngestData(params, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(params, request);
         }
     }
 

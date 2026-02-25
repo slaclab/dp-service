@@ -104,7 +104,6 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             ingestionRequestParams.setDoubleColumnList(doubleColumns); // add list of DoubleColumns to request parameters
@@ -112,7 +111,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(ingestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(ingestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(ingestionRequestParams, request);
         }
 
         // positive queryData() test case
@@ -134,8 +133,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -259,7 +257,6 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setDoubleColumnList(doubleColumns); // add list of DoubleColumns to request parameters
@@ -267,7 +264,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request);
         }
 
         // check that expected subscribeData() response is received
@@ -295,7 +292,6 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.DOUBLECOLUMN);
         assertEquals(1, responseDataBuckets.size());
         assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDoubleColumn());

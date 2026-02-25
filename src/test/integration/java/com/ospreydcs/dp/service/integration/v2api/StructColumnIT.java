@@ -119,7 +119,6 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             initialIngestionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column
@@ -128,7 +127,7 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(initialIngestionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(initialIngestionRequestParams, request);
         }
 
         // positive queryData() test case for struct column
@@ -149,8 +148,7 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryResultBuckets = queryServiceWrapper.queryData(
@@ -291,7 +289,6 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
                             null,
                             null,
                             null,
-                            false,
                             null
                     );
             subscriptionRequestParams.setDoubleColumnList(doubleColumns); // add scalar trigger column with trigger value
@@ -300,7 +297,7 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
             final IngestDataRequest request =
                     IngestionTestBase.buildIngestionRequest(subscriptionRequestParams);
 
-            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request, 0);
+            ingestionServiceWrapper.sendAndVerifyIngestData(subscriptionRequestParams, request);
         }
 
         // check that expected subscribeData() response is received for struct PV
@@ -334,7 +331,6 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                0,
                 DataBucket.DataCase.STRUCTCOLUMN
         );
 
