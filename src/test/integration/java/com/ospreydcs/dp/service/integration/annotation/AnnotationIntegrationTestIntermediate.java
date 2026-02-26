@@ -1,7 +1,6 @@
 package com.ospreydcs.dp.service.integration.annotation;
 
 import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
-import com.ospreydcs.dp.service.common.protobuf.EventMetadataUtility;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationTestBase;
 import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import org.junit.After;
@@ -251,13 +250,6 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
 
             final List<String> tags = List.of("unit tests", "positive");
             final Map<String, String> attributeMap = Map.of("service", "annotation", "feature", "annotation");
-            final EventMetadataUtility.EventMetadataParams eventMetadataParams =
-                    new EventMetadataUtility.EventMetadataParams(
-                            "unit test event",
-                            startSeconds,
-                            0L,
-                            null,
-                            null);
 
             final String firstHalfBase = "first half: ";
             final String secondHalfBase = "second half: ";
@@ -276,7 +268,6 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                                     firstHalfComment,
                                     tags,
                                     attributeMap,
-                                    eventMetadataParams,
                                     null);
                     final String createdAnnotationId = annotationServiceWrapper.sendAndVerifySaveAnnotation(
                             firstHalfParams, false, false, "");
@@ -301,7 +292,6 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                                     secondHalfComment,
                                     null,
                                     null,
-                                    null,
                                     null);
                     secondHalfAnnotationIds.add(
                             annotationServiceWrapper.sendAndVerifySaveAnnotation(
@@ -320,13 +310,6 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
             final String comment = "This positive test case covers an annotation with all required and optional fields set.";
             final List<String> tags = List.of("beam loss", "outage");
             final Map<String, String> attributeMap = Map.of("sector", "01", "subsystem", "vacuum");
-            final EventMetadataUtility.EventMetadataParams eventMetadataParams =
-                    new EventMetadataUtility.EventMetadataParams(
-                            "experiment 1234",
-                            startSeconds,
-                            0L,
-                            startSeconds+60,
-                            999_000_000L);
 
             final AnnotationTestBase.SaveAnnotationRequestParams params =
                     new AnnotationTestBase.SaveAnnotationRequestParams(
@@ -337,7 +320,7 @@ public class AnnotationIntegrationTestIntermediate extends GrpcIntegrationTestBa
                             comment,
                             tags,
                             attributeMap,
-                            eventMetadataParams, null);
+                            null);
             annotationWithAllFieldsParams = params;
 
             final String expectedRejectMessage = null;

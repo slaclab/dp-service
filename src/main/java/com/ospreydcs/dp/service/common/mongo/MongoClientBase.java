@@ -84,7 +84,6 @@ public abstract class MongoClientBase {
         CodecProvider pojoCodecProvider = PojoCodecProvider.builder().register(
                 ProviderDocument.class,
                 BucketDocument.class,
-                EventMetadataDocument.class,
                 RequestStatusDocument.class,
                 AnnotationDocument.class,
                 DataSetDocument.class,

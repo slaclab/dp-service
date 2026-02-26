@@ -470,8 +470,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
             if (queryParams.textCriterion != null) {
                 assertTrue(
                         foundAnnotation.getComment().contains(queryParams.textCriterion)
-                                || foundAnnotation.getName().contains(queryParams.textCriterion)
-                                || foundAnnotation.getEventMetadata().getDescription().contains(queryParams.textCriterion));
+                                || foundAnnotation.getName().contains(queryParams.textCriterion));
             }
 
             // check TagsCriterion
@@ -488,12 +487,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
                         resultAttributeMap.get(queryParams.attributesCriterionKey), queryParams.attributesCriterionValue);
             }
 
-            // check EventCriterion
-            if (queryParams.eventCriterion != null) {
-                assertTrue(foundAnnotation.getEventMetadata().getDescription().contains(queryParams.eventCriterion));
-            }
-
-            // compare dataset content from result with dataset in database
+           // compare dataset content from result with dataset in database
             for (DataSet responseDataSet : foundAnnotation.getDataSetsList()) {
                 final DataSetDocument dbDataSetDocument = mongoClient.findDataSet(responseDataSet.getId());
                 final DataSet dbDataSet = dbDataSetDocument.toDataSet();

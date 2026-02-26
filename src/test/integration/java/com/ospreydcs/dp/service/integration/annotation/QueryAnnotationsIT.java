@@ -269,23 +269,6 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                     createAnnotationScenarioResult.expectedQueryByNameAnnotations());
         }
 
-        // queryAnnotations() positive test for query by TextCriterion (over eventMetadata.description field).
-        {
-            final String eventDescriptionText = "1234";
-            final AnnotationTestBase.QueryAnnotationsParams queryParams =
-                    new AnnotationTestBase.QueryAnnotationsParams();
-            queryParams.setTextCriterion(eventDescriptionText);
-
-            final boolean expectReject = false;
-            final String expectedRejectMessage ="";
-
-            annotationServiceWrapper.sendAndVerifyQueryAnnotations(
-                    queryParams,
-                    expectReject,
-                    expectedRejectMessage,
-                    List.of(createAnnotationScenarioResult.annotationWithAllFieldsParams()));
-        }
-
         // queryAnnotations() positive test for query by AnnotationCriterion (by id of related annotation).
         {
             final String relatedAnnotationId = createAnnotationScenarioResult.secondHalfAnnotationIds().get(0);
@@ -352,7 +335,6 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                             "updated annotation",
                             createParams.tags,
                             createParams.attributeMap,
-                            createParams.eventMetadataParams,
                             createParams.calculations
                     );
             annotationServiceWrapper.sendAndVerifySaveAnnotation(

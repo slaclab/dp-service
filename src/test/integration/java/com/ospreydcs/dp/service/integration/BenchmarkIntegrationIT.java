@@ -11,7 +11,6 @@ import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
 import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.model.BenchmarkScenarioResult;
 import com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataBidiStream;
@@ -191,12 +190,6 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     assertEquals(
                             Date.from(Instant.ofEpochSecond(requestInfo.startSeconds, 999000000L)),
                             bucketDocument.getDataTimestamps().getLastTime().getDateTime());
-                    final EventMetadataDocument eventMetadataDocument = bucketDocument.getEvent();
-                    assertEquals("calibration test", eventMetadataDocument.getDescription());
-                    assertEquals(
-                            params.startSeconds,
-                            eventMetadataDocument.getStartTime().getSeconds());
-                    assertEquals(0, eventMetadataDocument.getStartTime().getNanos());
                     assertEquals("07", bucketDocument.getAttributes().get("sector"));
                     assertEquals("vacuum", bucketDocument.getAttributes().get("subsystem"));
 

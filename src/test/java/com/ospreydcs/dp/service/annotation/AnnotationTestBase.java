@@ -9,14 +9,12 @@ import com.ospreydcs.dp.grpc.v1.common.DataColumn;
 import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.grpc.v1.common.Timestamp;
 import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.protobuf.AttributesUtility;
-import com.ospreydcs.dp.service.common.protobuf.EventMetadataUtility;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
@@ -269,7 +267,6 @@ public class AnnotationTestBase {
         public final String comment;
         public final List<String> tags;
         public final Map<String, String> attributeMap;
-        public final EventMetadataUtility.EventMetadataParams eventMetadataParams;
         public final Calculations calculations;
 
         public SaveAnnotationRequestParams(String ownerId, String name, List<String> dataSetIds) {
@@ -281,7 +278,6 @@ public class AnnotationTestBase {
             this.comment = null;
             this.tags = null;
             this.attributeMap = null;
-            this.eventMetadataParams = null;
             this.calculations = null;
         }
 
@@ -294,7 +290,6 @@ public class AnnotationTestBase {
                 String comment,
                 List<String> tags,
                 Map<String, String> attributeMap,
-                EventMetadataUtility.EventMetadataParams eventMetadataParams,
                 Calculations calculations
         ) {
             this.id = id;
@@ -305,7 +300,6 @@ public class AnnotationTestBase {
             this.comment = comment;
             this.tags = tags;
             this.attributeMap = attributeMap;
-            this.eventMetadataParams = eventMetadataParams;
             this.calculations = calculations;
         }
     }
@@ -754,9 +748,6 @@ public class AnnotationTestBase {
         if (params.attributeMap != null) {
             requestBuilder.addAllAttributes(AttributesUtility.attributeListFromMap(params.attributeMap));
         }
-        if (params.eventMetadataParams != null) {
-            requestBuilder.setEventMetadata(EventMetadataUtility.eventMetadataFromParams(params.eventMetadataParams));
-        }
         if (params.calculations != null) {
             requestBuilder.setCalculations(params.calculations);
         }
@@ -1065,56 +1056,6 @@ public class AnnotationTestBase {
                     reader.readStringArray(attributeMapValuesPath));
         } else {
             assertFalse(reader.object().exists(attributeMapKeysPath));
-        }
-
-        // eventMetadata - description, start/stop times
-        final String eventMetadataDescriptionPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_DESCRIPTION;
-        final String eventMetadataStartSecondsPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_SECONDS;
-        final String eventMetadataStartNanosPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_NANOS;
-        final String eventMetadataStopSecondsPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_SECONDS;
-        final String eventMetadataStopNanosPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_NANOS;
-        if (bucketDocument.getEvent() != null) {
-            final EventMetadataDocument bucketEvent = bucketDocument.getEvent();
-            
-            if (bucketEvent.getDescription() != null) {
-                assertTrue(reader.object().exists(eventMetadataDescriptionPath));
-                assertEquals(
-                        bucketEvent.getDescription(),
-                        reader.readString(eventMetadataDescriptionPath));
-            }
-
-            if (bucketEvent.getStartTime() != null) {
-                assertTrue(reader.object().exists(eventMetadataStartSecondsPath));
-                assertEquals(
-                        bucketEvent.getStartTime().getSeconds(),
-                        reader.readLong(eventMetadataStartSecondsPath));
-                assertTrue(reader.object().exists(eventMetadataStartNanosPath));
-                assertEquals(
-                        bucketEvent.getStartTime().getNanos(),
-                        reader.readLong(eventMetadataStartNanosPath));
-            }
-
-            if (bucketEvent.getStopTime() != null) {
-                assertTrue(reader.object().exists(eventMetadataStopSecondsPath));
-                assertEquals(
-                        bucketEvent.getStopTime().getSeconds(),
-                        reader.readLong(eventMetadataStopSecondsPath));
-                assertTrue(reader.object().exists(eventMetadataStopNanosPath));
-                assertEquals(
-                        bucketEvent.getStopTime().getNanos(),
-                        reader.readLong(eventMetadataStopNanosPath));
-            }
-        } else {
-            assertFalse(reader.object().exists(eventMetadataDescriptionPath));
-            assertFalse(reader.object().exists(eventMetadataStartSecondsPath));
-            assertFalse(reader.object().exists(eventMetadataStartNanosPath));
-            assertFalse(reader.object().exists(eventMetadataStopSecondsPath));
-            assertFalse(reader.object().exists(eventMetadataStopNanosPath));
         }
 
         // providerId

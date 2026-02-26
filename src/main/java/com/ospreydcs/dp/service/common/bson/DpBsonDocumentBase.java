@@ -9,7 +9,6 @@ public abstract class DpBsonDocumentBase {
     // instance variables
     private List<String> tags;
     private Map<String, String> attributes;
-    private EventMetadataDocument event;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -27,14 +26,6 @@ public abstract class DpBsonDocumentBase {
 
     public void setAttributes(Map<String, String> attributes) {
         this.attributes = attributes;
-    }
-
-    public EventMetadataDocument getEvent() {
-        return event;
-    }
-
-    public void setEvent(EventMetadataDocument event) {
-        this.event = event;
     }
 
     public Instant getCreatedAt() {
