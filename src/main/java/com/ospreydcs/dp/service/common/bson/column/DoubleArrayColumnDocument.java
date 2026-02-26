@@ -2,6 +2,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.DoubleArrayColumn;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
@@ -83,6 +84,7 @@ public class DoubleArrayColumnDocument extends ArrayColumnDocumentBase {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         DoubleArrayColumn doubleArrayColumn = (DoubleArrayColumn) toProtobufColumn();
-        bucketBuilder.setDoubleArrayColumn(doubleArrayColumn);
+        DataValues dataValues = DataValues.newBuilder().setDoubleArrayColumn(doubleArrayColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 }

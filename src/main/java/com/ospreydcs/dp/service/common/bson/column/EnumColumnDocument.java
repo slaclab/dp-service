@@ -3,6 +3,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.EnumColumn;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
@@ -46,7 +47,8 @@ public class EnumColumnDocument extends ScalarColumnDocumentBase<Integer> {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         EnumColumn enumColumn = (EnumColumn) toProtobufColumn();
-        bucketBuilder.setEnumColumn(enumColumn);
+        DataValues dataValues = DataValues.newBuilder().setEnumColumn(enumColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 
     @Override

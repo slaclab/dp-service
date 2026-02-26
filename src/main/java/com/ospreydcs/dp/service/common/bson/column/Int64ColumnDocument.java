@@ -3,6 +3,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.Int64Column;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
@@ -35,7 +36,8 @@ public class Int64ColumnDocument extends ScalarColumnDocumentBase<Long> {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         Int64Column int64Column = (Int64Column) toProtobufColumn();
-        bucketBuilder.setInt64Column(int64Column);
+        DataValues dataValues = DataValues.newBuilder().setInt64Column(int64Column).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 
 }

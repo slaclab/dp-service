@@ -45,8 +45,8 @@ public class ScalarColumnDocumentBaseTest {
         document.addColumnToBucket(bucketBuilder);
         
         DataBucket bucket = bucketBuilder.build();
-        assertTrue(bucket.hasDoubleColumn());
-        DoubleColumn doubleColumn = bucket.getDoubleColumn();
+        assertTrue(bucket.getDataValues().hasDoubleColumn());
+        DoubleColumn doubleColumn = bucket.getDataValues().getDoubleColumn();
         assertEquals("test_pv", doubleColumn.getName());
         assertEquals(4, doubleColumn.getValuesCount());
         assertEquals(1.1, doubleColumn.getValues(0), 0.001);

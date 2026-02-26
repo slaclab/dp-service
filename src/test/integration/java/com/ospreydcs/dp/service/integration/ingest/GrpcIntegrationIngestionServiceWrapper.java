@@ -1122,10 +1122,10 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                 final long responseSeconds = responseTimestampsModel.getFirstTimestamp().getEpochSeconds();
                 final long responseNanos = responseTimestampsModel.getFirstTimestamp().getNanoseconds();
 
-                switch (dataBucket.getDataCase()) {
+                switch (dataBucket.getDataValues().getValuesCase()) {
                     case DATACOLUMN -> {
                         // add entries to pvTimestampColumnMap for regular DataColumns in response
-                        final DataColumn dataColumn = dataBucket.getDataColumn();
+                        final DataColumn dataColumn = dataBucket.getDataValues().getDataColumn();
                         addPvTimestampColumnMapEntry(
                                 pvTimestampColumnMap, responseSeconds, responseNanos, dataColumn, false);
                         responseColumnCount = responseColumnCount + 1;
@@ -1159,8 +1159,6 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     case INT64ARRAYCOLUMN -> {
                     }
                     case BOOLARRAYCOLUMN -> {
-                    }
-                    case DATA_NOT_SET -> {
                     }
                 }
             }

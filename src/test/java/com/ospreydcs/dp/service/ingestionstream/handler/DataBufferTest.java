@@ -58,7 +58,7 @@ public class DataBufferTest {
         assertEquals(1, flushedResults.size());
         DataBucket flushedBucket = flushedResults.get(0).getDataBucket();
         assertEquals(dataBucket, flushedBucket);
-        DataColumn resultColumn = flushedBucket.getDataColumn();
+        DataColumn resultColumn = flushedBucket.getDataValues().getDataColumn();
         assertEquals("test-pv", resultColumn.getName());
         assertEquals(0, dataBuffer.getBufferedItemCount());
     }
@@ -135,7 +135,7 @@ public class DataBufferTest {
 
         DataBucket dataBucket = DataBucket.newBuilder()
                 .setPvName(pvName)
-                .setDataColumn(dataColumn)
+                .setDataValues(DataValues.newBuilder().setDataColumn(dataColumn).build())
                 .setDataTimestamps(timestamps)
                 .build();
         List<DataBucket> dataBuckets = Collections.singletonList(dataBucket);

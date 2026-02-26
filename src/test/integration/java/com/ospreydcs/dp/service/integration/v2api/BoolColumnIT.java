@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
-import com.ospreydcs.dp.grpc.v1.common.BoolColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.Timestamp;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
@@ -125,9 +122,9 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertEquals(DataBucket.DataCase.BOOLCOLUMN, queryResultBucket.getDataCase());
-                assertTrue(pvNames.contains(queryResultBucket.getBoolColumn().getName()));
-                assertEquals(numSamples, queryResultBucket.getBoolColumn().getValuesCount());
+                assertEquals(DataValues.ValuesCase.BOOLCOLUMN, queryResultBucket.getDataValues().getValuesCase());
+                assertTrue(pvNames.contains(queryResultBucket.getDataValues().getBoolColumn().getName()));
+                assertEquals(numSamples, queryResultBucket.getDataValues().getBoolColumn().getValuesCount());
             }
         }
 
@@ -268,8 +265,8 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue(responseBucket.hasBoolColumn());
-            assertEquals(subscriptionColumn, responseBucket.getBoolColumn());
+            assertTrue(responseBucket.getDataValues().hasBoolColumn());
+            assertEquals(subscriptionColumn, responseBucket.getDataValues().getBoolColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received
@@ -277,9 +274,9 @@ public class BoolColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.BOOLCOLUMN);
+                DataValues.ValuesCase.BOOLCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getBoolColumn());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDataValues().getBoolColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

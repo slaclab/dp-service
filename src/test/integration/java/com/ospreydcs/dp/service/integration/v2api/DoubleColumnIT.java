@@ -2,10 +2,7 @@ package com.ospreydcs.dp.service.integration.v2api;
 
 import com.ospreydcs.dp.grpc.v1.annotation.ExportDataRequest;
 import com.ospreydcs.dp.grpc.v1.annotation.ExportDataResponse;
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
-import com.ospreydcs.dp.grpc.v1.common.Timestamp;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
@@ -144,7 +141,7 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertEquals(requestDoubleColumn, queryResultBucket.getDoubleColumn());
+                assertEquals(requestDoubleColumn, queryResultBucket.getDataValues().getDoubleColumn());
             }
         }
 
@@ -283,8 +280,8 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue(responseBucket.hasDoubleColumn());
-            assertEquals(subscriptionColumn, responseBucket.getDoubleColumn());
+            assertTrue(responseBucket.getDataValues().hasDoubleColumn());
+            assertEquals(subscriptionColumn, responseBucket.getDataValues().getDoubleColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received
@@ -292,9 +289,9 @@ public class DoubleColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.DOUBLECOLUMN);
+                DataValues.ValuesCase.DOUBLECOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDoubleColumn());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDataValues().getDoubleColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
 
         // tabular export test

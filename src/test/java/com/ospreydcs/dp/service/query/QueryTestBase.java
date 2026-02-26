@@ -741,7 +741,7 @@ public class QueryTestBase {
         // this compares each DataValue including ValueStatus, confirmed in debugger
         assertEquals(
                 requestColumn,
-                responseBucket.getDataColumn());
+                responseBucket.getDataValues().getDataColumn());
     }
 
 }

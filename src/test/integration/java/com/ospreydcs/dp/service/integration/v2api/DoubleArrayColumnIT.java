@@ -173,8 +173,8 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain DoubleArrayColumn", queryResultBucket.hasDoubleArrayColumn());
-                assertEquals(requestArrayColumn, queryResultBucket.getDoubleArrayColumn());
+                assertTrue("Query result should contain DoubleArrayColumn", queryResultBucket.getDataValues().hasDoubleArrayColumn());
+                assertEquals(requestArrayColumn, queryResultBucket.getDataValues().getDoubleArrayColumn());
             }
         }
 
@@ -344,8 +344,8 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Response bucket should contain DoubleArrayColumn", responseBucket.hasDoubleArrayColumn());
-            assertEquals(subscriptionArrayColumn, responseBucket.getDoubleArrayColumn());
+            assertTrue("Response bucket should contain DoubleArrayColumn", responseBucket.getDataValues().hasDoubleArrayColumn());
+            assertEquals(subscriptionArrayColumn, responseBucket.getDataValues().getDoubleArrayColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received for array PV
@@ -353,10 +353,10 @@ public class DoubleArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.DOUBLEARRAYCOLUMN);
+                DataValues.ValuesCase.DOUBLEARRAYCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertTrue("Event response bucket should contain DoubleArrayColumn", responseDataBuckets.get(0).hasDoubleArrayColumn());
-        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDoubleArrayColumn());
+        assertTrue("Event response bucket should contain DoubleArrayColumn", responseDataBuckets.get(0).getDataValues().hasDoubleArrayColumn());
+        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDataValues().getDoubleArrayColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
 
         // TODO: tabular export test for array column

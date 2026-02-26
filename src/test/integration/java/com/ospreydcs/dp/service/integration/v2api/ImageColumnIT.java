@@ -173,8 +173,8 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain ImageColumn", queryResultBucket.hasImageColumn());
-                assertEquals(requestImageColumn, queryResultBucket.getImageColumn());
+                assertTrue("Query result should contain ImageColumn", queryResultBucket.getDataValues().hasImageColumn());
+                assertEquals(requestImageColumn, queryResultBucket.getDataValues().getImageColumn());
             }
         }
 
@@ -346,9 +346,9 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket receivedBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Subscription response should contain ImageColumn", receivedBucket.hasImageColumn());
+            assertTrue("Subscription response should contain ImageColumn", receivedBucket.getDataValues().hasImageColumn());
             // Note: subscription receives the latest data, which is from the second ingestion (subscriptionImageColumn)
-            final ImageColumn receivedColumn = receivedBucket.getImageColumn();
+            final ImageColumn receivedColumn = receivedBucket.getDataValues().getImageColumn();
             assertEquals(imagePvName, receivedColumn.getName());
             assertEquals(640, receivedColumn.getImageDescriptor().getWidth());
             assertEquals(480, receivedColumn.getImageDescriptor().getHeight());
@@ -362,14 +362,14 @@ public class ImageColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.IMAGECOLUMN
+                DataValues.ValuesCase.IMAGECOLUMN
         );
 
         // verify the data event response contains the expected ImageColumn data
         assertEquals(1, responseDataBuckets.size());
         final DataBucket eventDataBucket = responseDataBuckets.get(0);
-        assertTrue("Event response should contain ImageColumn", eventDataBucket.hasImageColumn());
-        assertEquals(subscriptionImageColumn, responseDataBuckets.get(0).getImageColumn());
+        assertTrue("Event response should contain ImageColumn", eventDataBucket.getDataValues().hasImageColumn());
+        assertEquals(subscriptionImageColumn, responseDataBuckets.get(0).getDataValues().getImageColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

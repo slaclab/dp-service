@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.Int32Column;
-import com.ospreydcs.dp.grpc.v1.common.Timestamp;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
@@ -125,9 +122,9 @@ public class Int32ColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertEquals(DataBucket.DataCase.INT32COLUMN, queryResultBucket.getDataCase());
-                assertTrue(pvNames.contains(queryResultBucket.getInt32Column().getName()));
-                assertEquals(numSamples, queryResultBucket.getInt32Column().getValuesCount());
+                assertEquals(DataValues.ValuesCase.INT32COLUMN, queryResultBucket.getDataValues().getValuesCase());
+                assertTrue(pvNames.contains(queryResultBucket.getDataValues().getInt32Column().getName()));
+                assertEquals(numSamples, queryResultBucket.getDataValues().getInt32Column().getValuesCount());
             }
         }
 
@@ -268,8 +265,8 @@ public class Int32ColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue(responseBucket.hasInt32Column());
-            assertEquals(subscriptionColumn, responseBucket.getInt32Column());
+            assertTrue(responseBucket.getDataValues().hasInt32Column());
+            assertEquals(subscriptionColumn, responseBucket.getDataValues().getInt32Column());
         }
 
         // check that expected subscribeDataEvent() responses are received
@@ -277,9 +274,9 @@ public class Int32ColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.INT32COLUMN);
+                DataValues.ValuesCase.INT32COLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getInt32Column());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDataValues().getInt32Column());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

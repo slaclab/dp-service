@@ -4,6 +4,7 @@ import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.BoolColumn;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
@@ -35,7 +36,8 @@ public class BoolColumnDocument extends ScalarColumnDocumentBase<Boolean> {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         BoolColumn boolColumn = (BoolColumn) toProtobufColumn();
-        bucketBuilder.setBoolColumn(boolColumn);
+        DataValues dataValues = DataValues.newBuilder().setBoolColumn(boolColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 
 }

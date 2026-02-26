@@ -207,8 +207,8 @@ public class MongoQueryHandlerTestBase extends QueryTestBase {
         assertEquals(samplingClock.getStartTime().getNanoseconds(), bucketStartNanos);
         assertEquals(samplingClock.getPeriodNanos(), bucketSampleIntervalNanos);
         assertEquals(samplingClock.getCount(), bucketNumSamples);
-        assertTrue(bucket.hasDataColumn());
-        DataColumn bucketColumn = bucket.getDataColumn();
+        assertTrue(bucket.getDataValues().hasDataColumn());
+        DataColumn bucketColumn = bucket.getDataValues().getDataColumn();
         assertEquals(bucketColumn.getName(), bucketColumnName);
         assertEquals(bucketColumn.getDataValuesCount(), bucketNumSamples);
         for (int valueIndex = 0 ; valueIndex < bucketColumn.getDataValuesCount() ; valueIndex++) {

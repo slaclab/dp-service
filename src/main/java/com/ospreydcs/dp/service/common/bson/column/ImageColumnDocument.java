@@ -2,6 +2,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.ImageColumn;
 import com.ospreydcs.dp.grpc.v1.common.ImageDescriptor;
 import com.ospreydcs.dp.service.common.exception.DpException;
@@ -168,6 +169,7 @@ public class ImageColumnDocument extends BinaryColumnDocumentBase {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         ImageColumn imageColumn = (ImageColumn) toProtobufColumn();
-        bucketBuilder.setImageColumn(imageColumn);
+        DataValues dataValues = DataValues.newBuilder().setImageColumn(imageColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 }

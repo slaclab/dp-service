@@ -157,8 +157,8 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain SerializedDataColumn", queryResultBucket.hasSerializedDataColumn());
-                assertEquals(requestSerializedColumn, queryResultBucket.getSerializedDataColumn());
+                assertTrue("Query result should contain SerializedDataColumn", queryResultBucket.getDataValues().hasSerializedDataColumn());
+                assertEquals(requestSerializedColumn, queryResultBucket.getDataValues().getSerializedDataColumn());
             }
         }
 
@@ -306,9 +306,9 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket receivedBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Subscription response should contain SerializedDataColumn", receivedBucket.hasSerializedDataColumn());
+            assertTrue("Subscription response should contain SerializedDataColumn", receivedBucket.getDataValues().hasSerializedDataColumn());
             // Note: subscription receives the latest data, which is from the second ingestion (subscriptionSerializedColumn)
-            assertEquals(subscriptionSerializedColumn, receivedBucket.getSerializedDataColumn());
+            assertEquals(subscriptionSerializedColumn, receivedBucket.getDataValues().getSerializedDataColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received for serialized data PV
@@ -316,14 +316,14 @@ public class SerializedDataColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.SERIALIZEDDATACOLUMN
+                DataValues.ValuesCase.SERIALIZEDDATACOLUMN
         );
 
         // additional verification for event response
         assertEquals(1, responseDataBuckets.size());
         final DataBucket eventDataBucket = responseDataBuckets.get(0);
-        assertTrue("Event response should contain SerializedDataColumn", eventDataBucket.hasSerializedDataColumn());
-        assertEquals(subscriptionSerializedColumn, responseDataBuckets.get(0).getSerializedDataColumn());
+        assertTrue("Event response should contain SerializedDataColumn", eventDataBucket.getDataValues().hasSerializedDataColumn());
+        assertEquals(subscriptionSerializedColumn, responseDataBuckets.get(0).getDataValues().getSerializedDataColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

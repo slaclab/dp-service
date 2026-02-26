@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.EnumColumn;
-import com.ospreydcs.dp.grpc.v1.common.Timestamp;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
@@ -126,10 +123,10 @@ public class EnumColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertEquals(DataBucket.DataCase.ENUMCOLUMN, queryResultBucket.getDataCase());
-                assertTrue(pvNames.contains(queryResultBucket.getEnumColumn().getName()));
-                assertEquals(numSamples, queryResultBucket.getEnumColumn().getValuesCount());
-                assertEquals("test:alarm_status:v1", queryResultBucket.getEnumColumn().getEnumId());
+                assertEquals(DataValues.ValuesCase.ENUMCOLUMN, queryResultBucket.getDataValues().getValuesCase());
+                assertTrue(pvNames.contains(queryResultBucket.getDataValues().getEnumColumn().getName()));
+                assertEquals(numSamples, queryResultBucket.getDataValues().getEnumColumn().getValuesCount());
+                assertEquals("test:alarm_status:v1", queryResultBucket.getDataValues().getEnumColumn().getEnumId());
             }
         }
 
@@ -271,8 +268,8 @@ public class EnumColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue(responseBucket.hasEnumColumn());
-            assertEquals(subscriptionColumn, responseBucket.getEnumColumn());
+            assertTrue(responseBucket.getDataValues().hasEnumColumn());
+            assertEquals(subscriptionColumn, responseBucket.getDataValues().getEnumColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received
@@ -280,9 +277,9 @@ public class EnumColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.ENUMCOLUMN);
+                DataValues.ValuesCase.ENUMCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getEnumColumn());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDataValues().getEnumColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

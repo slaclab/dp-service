@@ -3,6 +3,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.FloatColumn;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
@@ -35,7 +36,8 @@ public class FloatColumnDocument extends ScalarColumnDocumentBase<Float> {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         FloatColumn floatColumn = (FloatColumn) toProtobufColumn();
-        bucketBuilder.setFloatColumn(floatColumn);
+        DataValues dataValues = DataValues.newBuilder().setFloatColumn(floatColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 
 }

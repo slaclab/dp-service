@@ -171,8 +171,8 @@ public class Int64ArrayColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain Int64ArrayColumn", queryResultBucket.hasInt64ArrayColumn());
-                assertEquals(requestArrayColumn, queryResultBucket.getInt64ArrayColumn());
+                assertTrue("Query result should contain Int64ArrayColumn", queryResultBucket.getDataValues().hasInt64ArrayColumn());
+                assertEquals(requestArrayColumn, queryResultBucket.getDataValues().getInt64ArrayColumn());
             }
         }
 
@@ -342,9 +342,9 @@ public class Int64ArrayColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket receivedBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Subscription response should contain Int64ArrayColumn", receivedBucket.hasInt64ArrayColumn());
+            assertTrue("Subscription response should contain Int64ArrayColumn", receivedBucket.getDataValues().hasInt64ArrayColumn());
             // Note: subscription receives the latest data, which is from the second ingestion (subscriptionArrayColumn)
-            final Int64ArrayColumn receivedColumn = receivedBucket.getInt64ArrayColumn();
+            final Int64ArrayColumn receivedColumn = receivedBucket.getDataValues().getInt64ArrayColumn();
             assertEquals(arrayPvName, receivedColumn.getName());
             assertTrue("Should have received array data", receivedColumn.getValuesCount() > 0);
         }
@@ -354,14 +354,14 @@ public class Int64ArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.INT64ARRAYCOLUMN
+                DataValues.ValuesCase.INT64ARRAYCOLUMN
         );
 
         // verify the data event response contains the expected Int64ArrayColumn data
         assertEquals(1, responseDataBuckets.size());
         final DataBucket eventDataBucket = responseDataBuckets.get(0);
-        assertTrue("Event response should contain Int64ArrayColumn", eventDataBucket.hasInt64ArrayColumn());
-        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getInt64ArrayColumn());
+        assertTrue("Event response should contain Int64ArrayColumn", eventDataBucket.getDataValues().hasInt64ArrayColumn());
+        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDataValues().getInt64ArrayColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

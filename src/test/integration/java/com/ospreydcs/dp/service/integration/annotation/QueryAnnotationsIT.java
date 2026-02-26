@@ -218,7 +218,7 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                                 boolean foundPvBucket = false;
                                 DataBucket matchingResponseBucket = null;
                                 for (DataBucket responseBucket : queryResultBuckets) {
-                                    if (Objects.equals(pvName, responseBucket.getDataColumn().getName())) {
+                                    if (Objects.equals(pvName, responseBucket.getDataValues().getDataColumn().getName())) {
                                         foundPvBucket = true;
                                         matchingResponseBucket = responseBucket;
                                         break;

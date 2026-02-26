@@ -84,14 +84,14 @@ public class ColumnTriggerUtility {
             PvConditionTrigger trigger,
             DataBucket dataBucket
     ) {
-        switch (dataBucket.getDataCase()) {
+        switch (dataBucket.getDataValues().getValuesCase()) {
             case DATACOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getDataColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getDataColumn(), dataBucket.getDataTimestamps());
             }
             case SERIALIZEDDATACOLUMN -> {
                 final DataColumn dataColumn;
                 try {
-                    dataColumn = DataColumn.parseFrom(dataBucket.getSerializedDataColumn().getPayload());
+                    dataColumn = DataColumn.parseFrom(dataBucket.getDataValues().getSerializedDataColumn().getPayload());
                 } catch (InvalidProtocolBufferException e) {
                     final String errorMsg = "InvalidProtocolBufferException msg: " + e.getMessage();
                     return new ColumnTriggerResult(true, errorMsg, null);
@@ -99,59 +99,57 @@ public class ColumnTriggerUtility {
                 return checkColumnTrigger(trigger, dataColumn, dataBucket.getDataTimestamps());
             }
             case DOUBLECOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getDoubleColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getDoubleColumn(), dataBucket.getDataTimestamps());
             }
             case FLOATCOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getFloatColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getFloatColumn(), dataBucket.getDataTimestamps());
             }
             case INT64COLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getInt64Column(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getInt64Column(), dataBucket.getDataTimestamps());
             }
             case INT32COLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getInt32Column(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getInt32Column(), dataBucket.getDataTimestamps());
             }
             case BOOLCOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getBoolColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getBoolColumn(), dataBucket.getDataTimestamps());
             }
             case STRINGCOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getStringColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getStringColumn(), dataBucket.getDataTimestamps());
             }
             case ENUMCOLUMN -> {
-                return checkColumnTrigger(trigger, dataBucket.getEnumColumn(), dataBucket.getDataTimestamps());
+                return checkColumnTrigger(trigger, dataBucket.getDataValues().getEnumColumn(), dataBucket.getDataTimestamps());
             }
             case IMAGECOLUMN -> {
             }
             case DOUBLEARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getDoubleArrayColumn().getName() + ")";
+                        + dataBucket.getDataValues().getDoubleArrayColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case FLOATARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getFloatArrayColumn().getName() + ")";
+                        + dataBucket.getDataValues().getFloatArrayColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case INT32ARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getInt32ArrayColumn().getName() + ")";
+                        + dataBucket.getDataValues().getInt32ArrayColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case INT64ARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getInt64ArrayColumn().getName() + ")";
+                        + dataBucket.getDataValues().getInt64ArrayColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case BOOLARRAYCOLUMN -> {
                 final String errorMsg = "Array column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getBoolArrayColumn().getName() + ")";
+                        + dataBucket.getDataValues().getBoolArrayColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
             }
             case STRUCTCOLUMN -> {
                 final String errorMsg = "Binary column types cannot be used as data event triggers (PV: " 
-                        + dataBucket.getStructColumn().getName() + ")";
+                        + dataBucket.getDataValues().getStructColumn().getName() + ")";
                 return new ColumnTriggerResult(true, errorMsg, null);
-            }
-            case DATA_NOT_SET -> {
             }
         }
 

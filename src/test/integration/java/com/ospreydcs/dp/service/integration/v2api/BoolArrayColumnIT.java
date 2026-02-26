@@ -171,8 +171,8 @@ public class BoolArrayColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain BoolArrayColumn", queryResultBucket.hasBoolArrayColumn());
-                assertEquals(requestArrayColumn, queryResultBucket.getBoolArrayColumn());
+                assertTrue("Query result should contain BoolArrayColumn", queryResultBucket.getDataValues().hasBoolArrayColumn());
+                assertEquals(requestArrayColumn, queryResultBucket.getDataValues().getBoolArrayColumn());
             }
         }
 
@@ -342,9 +342,9 @@ public class BoolArrayColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket receivedBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Subscription response should contain BoolArrayColumn", receivedBucket.hasBoolArrayColumn());
+            assertTrue("Subscription response should contain BoolArrayColumn", receivedBucket.getDataValues().hasBoolArrayColumn());
             // Note: subscription receives the latest data, which is from the second ingestion (subscriptionArrayColumn)
-            final BoolArrayColumn receivedColumn = receivedBucket.getBoolArrayColumn();
+            final BoolArrayColumn receivedColumn = receivedBucket.getDataValues().getBoolArrayColumn();
             assertEquals(arrayPvName, receivedColumn.getName());
             assertTrue("Should have received array data", receivedColumn.getValuesCount() > 0);
         }
@@ -354,14 +354,14 @@ public class BoolArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.BOOLARRAYCOLUMN
+                DataValues.ValuesCase.BOOLARRAYCOLUMN
         );
 
         // verify the data event response contains the expected BoolArrayColumn data
         assertEquals(1, responseDataBuckets.size());
         final DataBucket eventDataBucket = responseDataBuckets.get(0);
-        assertTrue("Event response should contain BoolArrayColumn", eventDataBucket.hasBoolArrayColumn());
-        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getBoolArrayColumn());
+        assertTrue("Event response should contain BoolArrayColumn", eventDataBucket.getDataValues().hasBoolArrayColumn());
+        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDataValues().getBoolArrayColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

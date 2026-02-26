@@ -347,7 +347,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
             try {
                 final FileOutputStream outputStream = new FileOutputStream(outputFile);
                 outputStream.write(
-                        responseBucket.getDataColumn().getDataValues(0).getImageValue().getImage().toByteArray());
+                        responseBucket.getDataValues().getDataColumn().getDataValues(0).getImageValue().getImage().toByteArray());
             } catch (IOException ex) {
                 fail("error writing test-image-output.bmp");
             }

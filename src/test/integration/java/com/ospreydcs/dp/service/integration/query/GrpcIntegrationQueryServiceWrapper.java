@@ -360,10 +360,10 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
             // get column name from either regular DataColumn or SerializedDataColumn
             String bucketColumnName = "";
-            if (dataBucket.hasDataColumn()) {
-                bucketColumnName = dataBucket.getDataColumn().getName();
-            } else if (dataBucket.hasSerializedDataColumn()) {
-                bucketColumnName = dataBucket.getSerializedDataColumn().getName();
+            if (dataBucket.getDataValues().hasDataColumn()) {
+                bucketColumnName = dataBucket.getDataValues().getDataColumn().getName();
+            } else if (dataBucket.getDataValues().hasSerializedDataColumn()) {
+                bucketColumnName = dataBucket.getDataValues().getSerializedDataColumn().getName();
             }
             assertFalse(bucketColumnName.isBlank());
 
@@ -429,8 +429,8 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
                     // get DataColumn from bucket
                     DataColumn responseDataColumn = null;
-                    if (responseBucket.hasDataColumn()) {
-                        responseDataColumn = responseBucket.getDataColumn();
+                    if (responseBucket.getDataValues().hasDataColumn()) {
+                        responseDataColumn = responseBucket.getDataValues().getDataColumn();
 
                     } else {
                         fail("responseBucket doesn't contain DataColumn");

@@ -352,8 +352,8 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                 assertTrue(queryData.getDataBucketsCount() > 0);
                 for (DataBucket bucket : queryData.getDataBucketsList()) {
 
-                    assertTrue(bucket.hasDataColumn());
-                    final DataColumn dataColumn = bucket.getDataColumn();
+                    assertTrue(bucket.getDataValues().hasDataColumn());
+                    final DataColumn dataColumn = bucket.getDataValues().getDataColumn();
                     final String columnName = dataColumn.getName();
                     assertNotNull(columnName);
                     assertNotNull(dataColumn.getDataValuesList());

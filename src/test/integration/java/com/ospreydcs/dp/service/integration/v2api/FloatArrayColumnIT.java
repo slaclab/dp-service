@@ -171,8 +171,8 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain FloatArrayColumn", queryResultBucket.hasFloatArrayColumn());
-                assertEquals(requestArrayColumn, queryResultBucket.getFloatArrayColumn());
+                assertTrue("Query result should contain FloatArrayColumn", queryResultBucket.getDataValues().hasFloatArrayColumn());
+                assertEquals(requestArrayColumn, queryResultBucket.getDataValues().getFloatArrayColumn());
             }
         }
 
@@ -342,8 +342,8 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Response bucket should contain FloatArrayColumn", responseBucket.hasFloatArrayColumn());
-            assertEquals(subscriptionArrayColumn, responseBucket.getFloatArrayColumn());
+            assertTrue("Response bucket should contain FloatArrayColumn", responseBucket.getDataValues().hasFloatArrayColumn());
+            assertEquals(subscriptionArrayColumn, responseBucket.getDataValues().getFloatArrayColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received for array PV
@@ -351,10 +351,10 @@ public class FloatArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.FLOATARRAYCOLUMN);
+                DataValues.ValuesCase.FLOATARRAYCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertTrue("Event response bucket should contain FloatArrayColumn", responseDataBuckets.get(0).hasFloatArrayColumn());
-        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getFloatArrayColumn());
+        assertTrue("Event response bucket should contain FloatArrayColumn", responseDataBuckets.get(0).getDataValues().hasFloatArrayColumn());
+        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDataValues().getFloatArrayColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

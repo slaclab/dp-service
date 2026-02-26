@@ -159,8 +159,8 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain StructColumn", queryResultBucket.hasStructColumn());
-                assertEquals(requestStructColumn, queryResultBucket.getStructColumn());
+                assertTrue("Query result should contain StructColumn", queryResultBucket.getDataValues().hasStructColumn());
+                assertEquals(requestStructColumn, queryResultBucket.getDataValues().getStructColumn());
             }
         }
 
@@ -318,9 +318,9 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket receivedBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Subscription response should contain StructColumn", receivedBucket.hasStructColumn());
+            assertTrue("Subscription response should contain StructColumn", receivedBucket.getDataValues().hasStructColumn());
             // Note: subscription receives the latest data, which is from the second ingestion (subscriptionStructColumn)
-            final StructColumn receivedColumn = receivedBucket.getStructColumn();
+            final StructColumn receivedColumn = receivedBucket.getDataValues().getStructColumn();
             assertEquals(structPvName, receivedColumn.getName());
             assertEquals("beam_position:v3", receivedColumn.getSchemaId());
             assertTrue("Should have received struct data", receivedColumn.getValuesCount() > 0);
@@ -331,14 +331,14 @@ public class StructColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.STRUCTCOLUMN
+                DataValues.ValuesCase.STRUCTCOLUMN
         );
 
         // verify the data event response contains the expected StructColumn data
         assertEquals(1, responseDataBuckets.size());
         final DataBucket eventDataBucket = responseDataBuckets.get(0);
-        assertTrue("Event response should contain StructColumn", eventDataBucket.hasStructColumn());
-        assertEquals(subscriptionStructColumn, responseDataBuckets.get(0).getStructColumn());
+        assertTrue("Event response should contain StructColumn", eventDataBucket.getDataValues().hasStructColumn());
+        assertEquals(subscriptionStructColumn, responseDataBuckets.get(0).getDataValues().getStructColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

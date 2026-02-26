@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.integration.v2api;
 
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.StringColumn;
-import com.ospreydcs.dp.grpc.v1.common.Timestamp;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
@@ -125,9 +122,9 @@ public class StringColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertEquals(DataBucket.DataCase.STRINGCOLUMN, queryResultBucket.getDataCase());
-                assertTrue(pvNames.contains(queryResultBucket.getStringColumn().getName()));
-                assertEquals(numSamples, queryResultBucket.getStringColumn().getValuesCount());
+                assertEquals(DataValues.ValuesCase.STRINGCOLUMN, queryResultBucket.getDataValues().getValuesCase());
+                assertTrue(pvNames.contains(queryResultBucket.getDataValues().getStringColumn().getName()));
+                assertEquals(numSamples, queryResultBucket.getDataValues().getStringColumn().getValuesCount());
             }
         }
 
@@ -268,8 +265,8 @@ public class StringColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue(responseBucket.hasStringColumn());
-            assertEquals(subscriptionColumn, responseBucket.getStringColumn());
+            assertTrue(responseBucket.getDataValues().hasStringColumn());
+            assertEquals(subscriptionColumn, responseBucket.getDataValues().getStringColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received
@@ -277,9 +274,9 @@ public class StringColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.STRINGCOLUMN);
+                DataValues.ValuesCase.STRINGCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getStringColumn());
+        assertEquals(subscriptionColumn, responseDataBuckets.get(0).getDataValues().getStringColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

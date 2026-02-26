@@ -141,7 +141,7 @@ public class DataBuffer {
             if (estimatedSize == 0L) {
                 logger.error(
                         "DataBuffer.estimateDataSize() returned zero for dataBucket.dataCase: "
-                                + dataBucket.getDataCase());
+                                + dataBucket.getDataValues().getValuesCase());
             }
 
             BufferedDataItem item = new BufferedDataItem(dataBucket, estimatedSize);
@@ -257,9 +257,9 @@ public class DataBuffer {
             DataBucket dataBucket
     ) {
         AtomicLong size = new AtomicLong(100); // Base overhead for timestamps and structure
-        switch(dataBucket.getDataCase()) {
+        switch(dataBucket.getDataValues().getValuesCase()) {
             case DATACOLUMN -> {
-                final DataColumn dataColumn = dataBucket.getDataColumn();
+                final DataColumn dataColumn = dataBucket.getDataValues().getDataColumn();
                 size.addAndGet(dataColumn.getName().length() * 2); // String overhead
                 size.addAndGet(dataColumn.getDataValuesList().size() * 50); // Base per-value overhead
                 dataColumn.getDataValuesList().forEach(dataValue -> {
@@ -286,45 +286,45 @@ public class DataBuffer {
                 });
             }
             case SERIALIZEDDATACOLUMN -> {
-                final SerializedDataColumn serializedDataColumn = dataBucket.getSerializedDataColumn();
+                final SerializedDataColumn serializedDataColumn = dataBucket.getDataValues().getSerializedDataColumn();
                 size.addAndGet(serializedDataColumn.getName().length() * 2); // String overhead
                 size.addAndGet(50); // Base overhead for data column bytes.
                 size.addAndGet(serializedDataColumn.getSerializedSize());
             }
             case DOUBLECOLUMN -> {
-                final DoubleColumn doubleColumn = dataBucket.getDoubleColumn();
+                final DoubleColumn doubleColumn = dataBucket.getDataValues().getDoubleColumn();
                 size.addAndGet(doubleColumn.getName().length() * 2);
                 size.addAndGet(doubleColumn.getValuesCount() * 8); // number of list elements * primitive size
             }
             case FLOATCOLUMN -> {
-                final FloatColumn floatColumn = dataBucket.getFloatColumn();
+                final FloatColumn floatColumn = dataBucket.getDataValues().getFloatColumn();
                 size.addAndGet(floatColumn.getName().length() * 2);
                 size.addAndGet(floatColumn.getValuesCount() * 4); // number of list elements * primitive size
             }
             case INT64COLUMN -> {
-                final Int64Column int64Column = dataBucket.getInt64Column();
+                final Int64Column int64Column = dataBucket.getDataValues().getInt64Column();
                 size.addAndGet(int64Column.getName().length() * 2);
                 size.addAndGet(int64Column.getValuesCount() * 8); // 8 bytes per long
             }
             case INT32COLUMN -> {
-                final Int32Column int32Column = dataBucket.getInt32Column();
+                final Int32Column int32Column = dataBucket.getDataValues().getInt32Column();
                 size.addAndGet(int32Column.getName().length() * 2);
                 size.addAndGet(int32Column.getValuesCount() * 4); // 4 bytes per int
             }
             case BOOLCOLUMN -> {
-                final BoolColumn boolColumn = dataBucket.getBoolColumn();
+                final BoolColumn boolColumn = dataBucket.getDataValues().getBoolColumn();
                 size.addAndGet(boolColumn.getName().length() * 2);
                 size.addAndGet(boolColumn.getValuesCount() * 1); // 1 byte per boolean
             }
             case STRINGCOLUMN -> {
-                final StringColumn stringColumn = dataBucket.getStringColumn();
+                final StringColumn stringColumn = dataBucket.getDataValues().getStringColumn();
                 size.addAndGet(stringColumn.getName().length() * 2);
                 for (String value : stringColumn.getValuesList()) {
                     size.addAndGet(value.length() * 2); // 2 bytes per character (UTF-16)
                 }
             }
             case ENUMCOLUMN -> {
-                final EnumColumn enumColumn = dataBucket.getEnumColumn();
+                final EnumColumn enumColumn = dataBucket.getDataValues().getEnumColumn();
                 size.addAndGet(enumColumn.getName().length() * 2);
                 size.addAndGet(enumColumn.getEnumId().length() * 2);
                 size.addAndGet(enumColumn.getValuesCount() * 4); // 4 bytes per int32
@@ -332,7 +332,7 @@ public class DataBuffer {
             case IMAGECOLUMN -> {
             }
             case DOUBLEARRAYCOLUMN -> {
-                final DoubleArrayColumn doubleArrayColumn = dataBucket.getDoubleArrayColumn();
+                final DoubleArrayColumn doubleArrayColumn = dataBucket.getDataValues().getDoubleArrayColumn();
                 size.addAndGet(doubleArrayColumn.getName().length() * 2);
                 // Calculate array size: elements per sample × samples × 8 bytes per double
                 int elementCount = 1;
@@ -343,7 +343,7 @@ public class DataBuffer {
                 size.addAndGet(doubleArrayColumn.getValuesCount() * 8); // 8 bytes per double
             }
             case FLOATARRAYCOLUMN -> {
-                final FloatArrayColumn floatArrayColumn = dataBucket.getFloatArrayColumn();
+                final FloatArrayColumn floatArrayColumn = dataBucket.getDataValues().getFloatArrayColumn();
                 size.addAndGet(floatArrayColumn.getName().length() * 2);
                 // Calculate array size: elements per sample × samples × 4 bytes per float
                 int elementCount = 1;
@@ -354,7 +354,7 @@ public class DataBuffer {
                 size.addAndGet(floatArrayColumn.getValuesCount() * 4); // 4 bytes per float
             }
             case INT32ARRAYCOLUMN -> {
-                final Int32ArrayColumn int32ArrayColumn = dataBucket.getInt32ArrayColumn();
+                final Int32ArrayColumn int32ArrayColumn = dataBucket.getDataValues().getInt32ArrayColumn();
                 size.addAndGet(int32ArrayColumn.getName().length() * 2);
                 // Calculate array size: elements per sample × samples × 4 bytes per int32
                 int elementCount = 1;
@@ -365,7 +365,7 @@ public class DataBuffer {
                 size.addAndGet(int32ArrayColumn.getValuesCount() * 4); // 4 bytes per int32
             }
             case INT64ARRAYCOLUMN -> {
-                final Int64ArrayColumn int64ArrayColumn = dataBucket.getInt64ArrayColumn();
+                final Int64ArrayColumn int64ArrayColumn = dataBucket.getDataValues().getInt64ArrayColumn();
                 size.addAndGet(int64ArrayColumn.getName().length() * 2);
                 // Calculate array size: elements per sample × samples × 8 bytes per int64
                 int elementCount = 1;
@@ -376,7 +376,7 @@ public class DataBuffer {
                 size.addAndGet(int64ArrayColumn.getValuesCount() * 8); // 8 bytes per int64
             }
             case BOOLARRAYCOLUMN -> {
-                final BoolArrayColumn boolArrayColumn = dataBucket.getBoolArrayColumn();
+                final BoolArrayColumn boolArrayColumn = dataBucket.getDataValues().getBoolArrayColumn();
                 size.addAndGet(boolArrayColumn.getName().length() * 2);
                 // Calculate array size: elements per sample × samples × 1 byte per bool
                 int elementCount = 1;
@@ -387,15 +387,13 @@ public class DataBuffer {
                 size.addAndGet(boolArrayColumn.getValuesCount() * 1); // 1 byte per bool
             }
             case STRUCTCOLUMN -> {
-                final StructColumn structColumn = dataBucket.getStructColumn();
+                final StructColumn structColumn = dataBucket.getDataValues().getStructColumn();
                 size.addAndGet(structColumn.getName().length() * 2); // name field
                 size.addAndGet(structColumn.getSchemaId().length() * 2); // schemaId field
                 // Calculate struct size: sum of all struct value byte arrays
                 for (com.google.protobuf.ByteString structValue : structColumn.getValuesList()) {
                     size.addAndGet(structValue.size()); // size of each struct
                 }
-            }
-            case DATA_NOT_SET -> {
             }
         }
 

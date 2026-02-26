@@ -3,6 +3,7 @@ package com.ospreydcs.dp.service.common.bson.column;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
@@ -57,6 +58,7 @@ SerializedDataColumnDocument extends BinaryColumnDocumentBase {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         SerializedDataColumn serializedDataColumn = (SerializedDataColumn) toProtobufColumn();
-        bucketBuilder.setSerializedDataColumn(serializedDataColumn);
+        DataValues dataValues = DataValues.newBuilder().setSerializedDataColumn(serializedDataColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 }

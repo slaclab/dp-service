@@ -171,8 +171,8 @@ public class Int32ArrayColumnIT extends GrpcIntegrationTestBase {
 
             assertEquals(numBucketsExpected, queryResultBuckets.size());
             for (DataBucket queryResultBucket : queryResultBuckets) {
-                assertTrue("Query result should contain Int32ArrayColumn", queryResultBucket.hasInt32ArrayColumn());
-                assertEquals(requestArrayColumn, queryResultBucket.getInt32ArrayColumn());
+                assertTrue("Query result should contain Int32ArrayColumn", queryResultBucket.getDataValues().hasInt32ArrayColumn());
+                assertEquals(requestArrayColumn, queryResultBucket.getDataValues().getInt32ArrayColumn());
             }
         }
 
@@ -342,8 +342,8 @@ public class Int32ArrayColumnIT extends GrpcIntegrationTestBase {
             assertTrue(subscriptionResponse.hasSubscribeDataResult());
             assertEquals(1, subscriptionResponse.getSubscribeDataResult().getDataBucketsCount());
             final DataBucket responseBucket = subscriptionResponse.getSubscribeDataResult().getDataBuckets(0);
-            assertTrue("Response bucket should contain Int32ArrayColumn", responseBucket.hasInt32ArrayColumn());
-            assertEquals(subscriptionArrayColumn, responseBucket.getInt32ArrayColumn());
+            assertTrue("Response bucket should contain Int32ArrayColumn", responseBucket.getDataValues().hasInt32ArrayColumn());
+            assertEquals(subscriptionArrayColumn, responseBucket.getDataValues().getInt32ArrayColumn());
         }
 
         // check that expected subscribeDataEvent() responses are received for array PV
@@ -351,10 +351,10 @@ public class Int32ArrayColumnIT extends GrpcIntegrationTestBase {
                 (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
                 expectedEventResponses,
                 expectedEventDataResponses,
-                DataBucket.DataCase.INT32ARRAYCOLUMN);
+                DataValues.ValuesCase.INT32ARRAYCOLUMN);
         assertEquals(1, responseDataBuckets.size());
-        assertTrue("Event response bucket should contain Int32ArrayColumn", responseDataBuckets.get(0).hasInt32ArrayColumn());
-        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getInt32ArrayColumn());
+        assertTrue("Event response bucket should contain Int32ArrayColumn", responseDataBuckets.get(0).getDataValues().hasInt32ArrayColumn());
+        assertEquals(subscriptionArrayColumn, responseDataBuckets.get(0).getDataValues().getInt32ArrayColumn());
         ingestionStreamServiceWrapper.closeSubscribeDataEventCall(subscribeDataEventCall);
     }
 }

@@ -2,6 +2,7 @@ package com.ospreydcs.dp.service.integration.ingestionstream;
 
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.DpIngestionStreamServiceGrpc;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.SubscribeDataEventRequest;
@@ -146,7 +147,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
             IngestionStreamTestBase.SubscribeDataEventResponseObserver responseObserver,
             Map<PvConditionTrigger, List<SubscribeDataEventResponse.Event>> expectedEventResponses,
             Map<SubscribeDataEventResponse.Event, Map<String, List<Instant>>> expectedEventDataResponses,
-            DataBucket.DataCase bucketDataCase
+            DataValues.ValuesCase bucketDataCase
     ) {
         // wait for completion of API method response stream and confirm not in error state
         responseObserver.awaitResponseLatch();
@@ -185,7 +186,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
                     final List<DataBucket> eventBuckets = eventData.getDataBucketsList();
                     for (DataBucket dataBucket : eventBuckets) {
                         if (bucketDataCase != null) {
-                            assertEquals(bucketDataCase, dataBucket.getDataCase());
+                            assertEquals(bucketDataCase, dataBucket.getDataValues().getValuesCase());
                         }
                         final DataTimestamps bucketDataTimestamps = dataBucket.getDataTimestamps();
                         final DataTimestampsUtility.DataTimestampsModel bucketDataTimestampsModel =

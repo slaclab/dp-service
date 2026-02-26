@@ -122,7 +122,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setDataColumn(requestDataColumn)
+                        .setDataValues(DataValues.newBuilder().setDataColumn(requestDataColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -142,7 +142,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setSerializedDataColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setSerializedDataColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -162,7 +162,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setDoubleColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setDoubleColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -182,7 +182,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setFloatColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setFloatColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -202,7 +202,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setInt64Column(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setInt64Column(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -222,7 +222,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setInt32Column(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setInt32Column(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -242,7 +242,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setBoolColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setBoolColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -262,7 +262,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setStringColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setStringColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -282,7 +282,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setEnumColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setEnumColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -302,7 +302,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setDoubleArrayColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setDoubleArrayColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -322,7 +322,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setFloatArrayColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setFloatArrayColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -342,7 +342,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setInt32ArrayColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setInt32ArrayColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -362,7 +362,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setInt64ArrayColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setInt64ArrayColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -382,7 +382,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setBoolArrayColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setBoolArrayColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -402,7 +402,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setStructColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setStructColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();
@@ -422,7 +422,7 @@ public class SourceMonitorManager {
                 DataBucket columnBucket = DataBucket.newBuilder()
                         .setPvName(pvName)
                         .setDataTimestamps(requestDataTimestamps)
-                        .setImageColumn(requestColumn)
+                        .setDataValues(DataValues.newBuilder().setImageColumn(requestColumn).build())
                         .setProviderId(request.getProviderId())
                         .setProviderName(providerName)
                         .build();

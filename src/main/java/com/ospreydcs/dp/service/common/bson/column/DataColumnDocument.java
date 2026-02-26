@@ -105,6 +105,7 @@ public class DataColumnDocument extends ColumnDocumentBase {
     @Override
     public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
         DataColumn dataColumn = this.toDataColumn();
-        bucketBuilder.setDataColumn(dataColumn);
+        DataValues dataValues = DataValues.newBuilder().setDataColumn(dataColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 }
