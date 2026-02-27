@@ -5,7 +5,6 @@ import com.ospreydcs.dp.grpc.v1.annotation.*;
 import com.ospreydcs.dp.grpc.v1.common.CalculationsSpec;
 import com.ospreydcs.dp.grpc.v1.common.Timestamp;
 import com.ospreydcs.dp.service.common.protobuf.AttributesUtility;
-import com.ospreydcs.dp.service.common.protobuf.EventMetadataUtility;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -271,7 +270,6 @@ public class AnnotationClient extends ServiceApiClientBase {
             String comment,
             List<String> tags,
             Map<String, String> attributeMap,
-            EventMetadataUtility.EventMetadataParams eventMetadataParams,
             Calculations calculations
     ) {
     }
@@ -800,9 +798,6 @@ public class AnnotationClient extends ServiceApiClientBase {
         }
         if (params.attributeMap != null) {
             requestBuilder.addAllAttributes(AttributesUtility.attributeListFromMap(params.attributeMap));
-        }
-        if (params.eventMetadataParams != null) {
-            requestBuilder.setEventMetadata(EventMetadataUtility.eventMetadataFromParams(params.eventMetadataParams));
         }
         if (params.calculations != null) {
             requestBuilder.setCalculations(params.calculations);

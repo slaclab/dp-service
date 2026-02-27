@@ -1,9 +1,8 @@
 package com.ospreydcs.dp.service.integration.ingestionstream;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
 import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
+import com.ospreydcs.dp.grpc.v1.common.DataValues;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.DpIngestionStreamServiceGrpc;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.PvConditionTrigger;
 import com.ospreydcs.dp.grpc.v1.ingestionstream.SubscribeDataEventRequest;
@@ -16,7 +15,6 @@ import com.ospreydcs.dp.service.ingestionstream.handler.IngestionStreamHandler;
 import com.ospreydcs.dp.service.ingestionstream.handler.interfaces.IngestionStreamHandlerInterface;
 import com.ospreydcs.dp.service.ingestionstream.service.IngestionStreamServiceImpl;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationServiceWrapperBase;
-import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
@@ -35,6 +33,11 @@ import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Ingestion Stream Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegrationServiceWrapperBase<IngestionStreamServiceImpl> {
 
     // static variables
@@ -114,7 +117,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
         return new IngestionStreamTestBase.SubscribeDataEventCall(requestObserver, responseObserver);
     }
 
-    protected IngestionStreamTestBase.SubscribeDataEventCall initiateSubscribeDataEventRequest(
+    public IngestionStreamTestBase.SubscribeDataEventCall initiateSubscribeDataEventRequest(
             IngestionStreamTestBase.SubscribeDataEventRequestParams requestParams,
             int expectedEventResponseCount,
             int expectedDataBucketCount,
@@ -140,13 +143,11 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
         assertTrue(responseObserver.getErrorMessage().contains(errorMsg));
     }
 
-    protected void verifySubscribeDataEventResponse(
+    public List<DataBucket> verifySubscribeDataEventResponse(
             IngestionStreamTestBase.SubscribeDataEventResponseObserver responseObserver,
-            IngestionStreamTestBase.SubscribeDataEventRequestParams requestParams,
-            Map<String, GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo> ingestionValidationMap,
             Map<PvConditionTrigger, List<SubscribeDataEventResponse.Event>> expectedEventResponses,
             Map<SubscribeDataEventResponse.Event, Map<String, List<Instant>>> expectedEventDataResponses,
-            int numExpectedSerializedColumns
+            DataValues.ValuesCase bucketDataCase
     ) {
         // wait for completion of API method response stream and confirm not in error state
         responseObserver.awaitResponseLatch();
@@ -159,6 +160,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
         final Map<PvConditionTrigger, List<SubscribeDataEventResponse.Event>> actualEventResponses = new HashMap<>();
         Map<SubscribeDataEventResponse.Event, Map<String, List<Instant>>> actualEventDataResponses = new HashMap<>();
         int actualSerializedColumnCount = 0;
+        List<DataBucket> dataBuckets = new ArrayList<>();
         for (SubscribeDataEventResponse response : responseList) {
 
             switch (response.getResultCase()) {
@@ -183,29 +185,18 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
                             actualEventDataResponses.computeIfAbsent(event, k -> new HashMap<>());
                     final List<DataBucket> eventBuckets = eventData.getDataBucketsList();
                     for (DataBucket dataBucket : eventBuckets) {
-                        DataColumn bucketColumn = null;
-                        if (dataBucket.hasDataColumn()) {
-                            bucketColumn = dataBucket.getDataColumn();
-                        } else if (dataBucket.hasSerializedDataColumn()) {
-                            actualSerializedColumnCount = actualSerializedColumnCount + 1;
-                            try {
-                                bucketColumn =
-                                        DataColumn.parseFrom(dataBucket.getSerializedDataColumn().getDataColumnBytes());
-                            } catch (InvalidProtocolBufferException e) {
-                                fail(("InvalidProtocolException parsing SerializedDataColumn: " + e.getMessage()));
-                            }
-                        } else {
-                            fail("unknown column type in DataBucket");
+                        if (bucketDataCase != null) {
+                            assertEquals(bucketDataCase, dataBucket.getDataValues().getValuesCase());
                         }
-                        assertNotNull(bucketColumn);
                         final DataTimestamps bucketDataTimestamps = dataBucket.getDataTimestamps();
                         final DataTimestampsUtility.DataTimestampsModel bucketDataTimestampsModel =
                                 new DataTimestampsUtility.DataTimestampsModel(bucketDataTimestamps);
-                        final String bucketPvName = bucketColumn.getName();
+                        final String bucketPvName = dataBucket.getPvName();
                         final List<Instant> bucketInstants =
                                 actualEventBucketTimesMap.computeIfAbsent(bucketPvName, k -> new TreeList<>());
                         bucketInstants.add(
                                 TimestampUtility.instantFromTimestamp(bucketDataTimestampsModel.getFirstTimestamp()));
+                        dataBuckets.add(dataBucket);
                     }
                 }
                 case RESULT_NOT_SET -> {
@@ -243,8 +234,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
             }
         }
 
-        // check actual number of SerializedDataColumns in response matches expected
-        assertEquals(numExpectedSerializedColumns, actualSerializedColumnCount);
+        return dataBuckets;
     }
     
     protected void cancelSubscribeDataEventCall(IngestionStreamTestBase.SubscribeDataEventCall subscribeDataEventCall) {
@@ -263,7 +253,7 @@ public class GrpcIntegrationIngestionStreamServiceWrapper extends GrpcIntegratio
 
     }
 
-    protected void closeSubscribeDataEventCall(IngestionStreamTestBase.SubscribeDataEventCall subscribeDataEventCall) {
+    public void closeSubscribeDataEventCall(IngestionStreamTestBase.SubscribeDataEventCall subscribeDataEventCall) {
 
         // close the request stream
         new Thread(subscribeDataEventCall.requestObserver()::onCompleted).start();

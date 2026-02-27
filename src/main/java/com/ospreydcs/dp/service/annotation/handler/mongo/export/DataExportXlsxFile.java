@@ -12,6 +12,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.*;
 import java.util.List;
 
+/**
+ * This class provides an interface for writing data to an Excel / XLSX output file.  It is created and managed by
+ * ExportDataJobExcel and ExportDataJobAbstractTabular, respectively.
+ *
+ * It implements the TabularDataExportFileInterface methods, writeHeaderRow(), writeData(), and close().  The methods
+ * use the org.apache.poi.xssf library for creating and writing the xlsx file.
+ */
 public class DataExportXlsxFile implements TabularDataExportFileInterface {
 
     // constants

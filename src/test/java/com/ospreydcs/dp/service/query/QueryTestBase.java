@@ -21,6 +21,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
+/**
+ * Base class for unit and integration tests covering the Query Service APIs.  Provides utilities for those tests,
+ * including 1) params objects for creating protobuf API requests, 2) methods for building protobuf API requests from
+ * the params, 3) observers for the API response streams, and 4) utilities for verifying the API results.
+ */
 public class QueryTestBase {
 
     // static variables
@@ -31,8 +36,7 @@ public class QueryTestBase {
             Long beginTimeSeconds,
             Long beginTimeNanos,
             Long endTimeSeconds,
-            Long endTimeNanos,
-            boolean useSerializedDataColumns
+            Long endTimeNanos
     ) {
     }
 
@@ -99,9 +103,6 @@ public class QueryTestBase {
             endTimeBuilder.build();
             querySpecBuilder.setEndTime(endTimeBuilder);
         }
-
-        // specify whether to use SerializedDataColumns or regular DataColumns
-        querySpecBuilder.setUseSerializedDataColumns(params.useSerializedDataColumns);
 
         querySpecBuilder.build();
         requestBuilder.setQuerySpec(querySpecBuilder);
@@ -740,7 +741,7 @@ public class QueryTestBase {
         // this compares each DataValue including ValueStatus, confirmed in debugger
         assertEquals(
                 requestColumn,
-                responseBucket.getDataColumn());
+                responseBucket.getDataValues().getDataColumn());
     }
 
 }

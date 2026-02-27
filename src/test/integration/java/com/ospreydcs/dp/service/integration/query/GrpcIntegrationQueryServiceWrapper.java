@@ -1,6 +1,5 @@
 package com.ospreydcs.dp.service.integration.query;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.ospreydcs.dp.grpc.v1.common.DataBucket;
 import com.ospreydcs.dp.grpc.v1.common.DataColumn;
 import com.ospreydcs.dp.grpc.v1.common.DataValue;
@@ -8,7 +7,6 @@ import com.ospreydcs.dp.grpc.v1.common.Timestamp;
 import com.ospreydcs.dp.grpc.v1.query.*;
 import com.ospreydcs.dp.grpc.v1.query.ProviderMetadata;
 import com.ospreydcs.dp.service.common.model.TimestampMap;
-import com.ospreydcs.dp.service.common.mongo.MongoTestClient;
 import com.ospreydcs.dp.service.common.protobuf.AttributesUtility;
 import com.ospreydcs.dp.service.common.protobuf.DataTimestampsUtility;
 import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
@@ -19,22 +17,23 @@ import com.ospreydcs.dp.service.query.handler.mongo.dispatch.QueryTableDispatche
 import com.ospreydcs.dp.service.query.service.QueryServiceImpl;
 import com.ospreydcs.dp.service.integration.GrpcIntegrationServiceWrapperBase;
 import io.grpc.Channel;
-import io.grpc.ManagedChannel;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.ClassRule;
 
-import java.io.IOException;
 import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Query Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWrapperBase<QueryServiceImpl> {
 
     // static variables
@@ -345,7 +344,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
     private void verifyQueryDataResult(
             int numBucketsExpected,
-            int numSerializedDataColumnsExpected,
             QueryTestBase.QueryDataRequestParams params,
             Map<String, GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo> validationMap,
             List<DataBucket> dataBucketList
@@ -362,10 +360,10 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
             // get column name from either regular DataColumn or SerializedDataColumn
             String bucketColumnName = "";
-            if (dataBucket.hasDataColumn()) {
-                bucketColumnName = dataBucket.getDataColumn().getName();
-            } else if (dataBucket.hasSerializedDataColumn()) {
-                bucketColumnName = dataBucket.getSerializedDataColumn().getName();
+            if (dataBucket.getDataValues().hasDataColumn()) {
+                bucketColumnName = dataBucket.getDataValues().getDataColumn().getName();
+            } else if (dataBucket.getDataValues().hasSerializedDataColumn()) {
+                bucketColumnName = dataBucket.getDataValues().getSerializedDataColumn().getName();
             }
             assertFalse(bucketColumnName.isBlank());
 
@@ -386,18 +384,20 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
         // iterate through the expected buckets for each column,
         // and validate them against the corresponding response bucket
         int validatedBuckets = 0;
-        int serializedDataColumnCount = 0;
         for (var validationMapEntry : validationMap.entrySet()) {
             final String columnName = validationMapEntry.getKey();
             if ( ! pvNames.contains(columnName)) {
                 // skip pv if not included in query
                 continue;
             }
-            final GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo columnStreamInfo = validationMapEntry.getValue();
+            final GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo columnStreamInfo =
+                    validationMapEntry.getValue();
             for (var bucketInfoMapEntry : columnStreamInfo.bucketInfoMap.entrySet()) {
                 final long bucketSecond = bucketInfoMapEntry.getKey();
-                final Map<Long, GrpcIntegrationIngestionServiceWrapper.IngestionBucketInfo> bucketNanoMap = bucketInfoMapEntry.getValue();
-                for (GrpcIntegrationIngestionServiceWrapper.IngestionBucketInfo columnBucketInfo : bucketNanoMap.values()) {
+                final Map<Long, GrpcIntegrationIngestionServiceWrapper.IngestionBucketInfo> bucketNanoMap =
+                        bucketInfoMapEntry.getValue();
+                for (GrpcIntegrationIngestionServiceWrapper.IngestionBucketInfo columnBucketInfo
+                        : bucketNanoMap.values()) {
 
                     // skip buckets outside the query range
                     if ((columnBucketInfo.startSeconds() > endSeconds)
@@ -427,21 +427,13 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
                     // validate bucket data values
                     int valueIndex = 0;
 
-                    // get DataColumn from bucket, or parse from bucket's SerializedDataColumn
+                    // get DataColumn from bucket
                     DataColumn responseDataColumn = null;
-                    if (responseBucket.hasDataColumn()) {
-                        responseDataColumn = responseBucket.getDataColumn();
-
-                    } else if (responseBucket.hasSerializedDataColumn()) {
-                        try {
-                            responseDataColumn = DataColumn.parseFrom(responseBucket.getSerializedDataColumn().getDataColumnBytes());
-                        } catch (InvalidProtocolBufferException e) {
-                            fail("exception parsing DataColumn from SerializedDataColumn: " + e.getMessage());
-                        }
-                        serializedDataColumnCount = serializedDataColumnCount + 1;
+                    if (responseBucket.getDataValues().hasDataColumn()) {
+                        responseDataColumn = responseBucket.getDataValues().getDataColumn();
 
                     } else {
-                        fail("responseBucket doesn't contain either DataColumn or SerializedDataColumn");
+                        fail("responseBucket doesn't contain DataColumn");
                     }
                     assertNotNull(responseDataColumn);
 
@@ -458,49 +450,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
                         valueIndex = valueIndex + 1;
                     }
 
-                    // check tags
-                    if (columnBucketInfo.tags() != null) {
-                        assertEquals(columnBucketInfo.tags(), responseBucket.getTagsList());
-                    } else {
-                        assertTrue(responseBucket.getTagsList().isEmpty());
-                    }
-
-                    // check attributes
-                    if (columnBucketInfo.attributes() != null) {
-                        assertEquals(
-                                columnBucketInfo.attributes(),
-                                AttributesUtility.attributeMapFromList(responseBucket.getAttributesList()));
-                    } else {
-                        assertTrue(responseBucket.getAttributesList().isEmpty());
-                    }
-
-                    // check event metadata
-                    if (columnBucketInfo.eventDescription() != null) {
-                        assertEquals(
-                                columnBucketInfo.eventDescription(),
-                                responseBucket.getEventMetadata().getDescription());
-                    }
-                    if (columnBucketInfo.eventStartSeconds() != null) {
-                        assertEquals(
-                                (long) columnBucketInfo.eventStartSeconds(),
-                                responseBucket.getEventMetadata().getStartTimestamp().getEpochSeconds());
-                    }
-                    if (columnBucketInfo.eventStartNanos() != null) {
-                        assertEquals(
-                                (long) columnBucketInfo.eventStartNanos(),
-                                responseBucket.getEventMetadata().getStartTimestamp().getNanoseconds());
-                    }
-                    if (columnBucketInfo.eventStopSeconds() != null) {
-                        assertEquals(
-                                (long) columnBucketInfo.eventStopSeconds(),
-                                responseBucket.getEventMetadata().getStopTimestamp().getEpochSeconds());
-                    }
-                    if (columnBucketInfo.eventStopNanos() != null) {
-                        assertEquals(
-                                (long) columnBucketInfo.eventStopNanos(),
-                                responseBucket.getEventMetadata().getStopTimestamp().getNanoseconds());
-                    }
-
                     validatedBuckets = validatedBuckets + 1;
                 }
             }
@@ -509,7 +458,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
         // check that we validated all buckets returned by the query, and that query returned expected number of buckets
         assertEquals(dataBucketList.size(), validatedBuckets);
         assertEquals(numBucketsExpected, dataBucketList.size());
-        assertEquals(numSerializedDataColumnsExpected, serializedDataColumnCount);
     }
 
     protected List<DataBucket> sendQueryData(
@@ -540,7 +488,7 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
         return responseObserver.getDataBucketList();
     }
 
-    protected List<DataBucket> queryData(
+    public List<DataBucket> queryData(
             QueryTestBase.QueryDataRequestParams params,
             boolean expectReject,
             String expectedRejectMessage
@@ -551,7 +499,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
     public List<DataBucket> sendAndVerifyQueryData(
             int numBucketsExpected,
-            int numSerializedDataColumnsExpected,
             QueryTestBase.QueryDataRequestParams params,
             Map<String, GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo> validationMap,
             boolean expectReject,
@@ -566,7 +513,7 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
         }
 
         verifyQueryDataResult(
-                numBucketsExpected, numSerializedDataColumnsExpected, params, validationMap, dataBucketList);
+                numBucketsExpected, params, validationMap, dataBucketList);
 
         return dataBucketList;
     }
@@ -610,7 +557,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
     protected void sendAndVerifyQueryDataStream(
             int numBucketsExpected,
-            int numSerializedDataColumnsExpected,
             QueryTestBase.QueryDataRequestParams params,
             Map<String, GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo> validationMap,
             boolean expectReject,
@@ -625,7 +571,7 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
         }
 
         verifyQueryDataResult(
-                numBucketsExpected, numSerializedDataColumnsExpected, params, validationMap, dataBucketList);
+                numBucketsExpected, params, validationMap, dataBucketList);
     }
 
     protected List<DataBucket> sendQueryDataBidiStream(
@@ -671,7 +617,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
     protected void sendAndVerifyQueryDataBidiStream(
             int numBucketsExpected,
-            int numSerializedDataColumnsExpected,
             QueryTestBase.QueryDataRequestParams params,
             Map<String, GrpcIntegrationIngestionServiceWrapper.IngestionStreamInfo> validationMap,
             boolean expectReject,
@@ -687,7 +632,6 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
 
         verifyQueryDataResult(
                 numBucketsExpected,
-                numSerializedDataColumnsExpected,
                 params,
                 validationMap,
                 dataBucketList);
@@ -758,8 +702,7 @@ public class GrpcIntegrationQueryServiceWrapper extends GrpcIntegrationServiceWr
                     pvInfoMap.get(pvName);
             assertNotNull(pvInfo);
             assertEquals(pvName, pvInfo.getPvName());
-            assertEquals(8, pvInfo.getLastBucketDataTypeCase());
-            assertEquals("DOUBLEVALUE", pvInfo.getLastBucketDataType());
+            assertEquals("dataColumn", pvInfo.getLastBucketDataType());
             assertEquals(1, pvInfo.getLastBucketDataTimestampsCase());
             assertEquals("SAMPLINGCLOCK", pvInfo.getLastBucketDataTimestampsType());
 

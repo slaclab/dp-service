@@ -19,6 +19,10 @@ import java.util.Map;
 
 import static org.junit.Assert.assertTrue;
 
+/**
+ * This class provides integration test coverage for the event triggering mechanism of the subscribeDataEvent()
+ * handling framework.
+ */
 public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
 
     // static variables
@@ -35,6 +39,13 @@ public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
         super.tearDown();
     }
 
+    /**
+     * This test case provides positive test coverage for subscribeDataEvent() event triggering.  It ingests some data
+     * for the relevant PVs (required so that subscription PV validation succeeds), then creates 3 subscriptions via
+     * subscribeDataEvent() that exercise the event triggering framework (see comments for scenario details inline). It
+     * then runs another ingestion scenario that causes triggered event messages to be sent in the subscription response
+     * streams, and verifies the content of those messages.
+     */
     @Test
     public void testSubscribeDataEventTrigger() {
 
@@ -315,29 +326,26 @@ public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
             // request 1: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall.responseObserver(),
-                    requestParams1,
-                    ingestionScenarioResult.validationMap(),
-                    expectedEventResponses1, null, 0);
+                    expectedEventResponses1, null, null);
             subscribeDataEventCall.requestObserver().onCompleted();
 
             // request 2: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall2.responseObserver(),
-                    requestParams2,
-                    ingestionScenarioResult.validationMap(),
-                    expectedEventResponses2, null, 0);
+                    expectedEventResponses2, null, null);
             subscribeDataEventCall2.requestObserver().onCompleted();
 
             // request 3: verify subscribeDataEvent() responses and close request stream
             ingestionStreamServiceWrapper.verifySubscribeDataEventResponse(
                     (IngestionStreamTestBase.SubscribeDataEventResponseObserver) subscribeDataEventCall3.responseObserver(),
-                    requestParams3,
-                    ingestionScenarioResult.validationMap(),
-                    expectedEventResponses3, null, 0);
+                    expectedEventResponses3, null, null);
             subscribeDataEventCall3.requestObserver().onCompleted();
         }
     }
 
+    /**
+     * This test case provides negative test coverage for a subscribeDataEvent() reject due to data type mismatch.
+     */
     @Test
     public void testSubscribeDataEventTriggerRejectDataTypeMismatch() {
 
@@ -420,6 +428,9 @@ public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
         }
     }
 
+    /**
+     * This test case provides negative test coverage for a subscribeDataEvent() reject due to invalid PV name.
+     */
     @Test
     public void testSubscribeDataEventRejectInvalidPvName() {
 
@@ -482,6 +493,10 @@ public class SubscribeDataEventTriggerIT extends GrpcIntegrationTestBase {
         }
     }
 
+    /**
+     * This test case provides negative test coverage for a subscribeDataEvent() rejects for different scenarios related
+     * to invalid trigger specifications.
+     */
     @Test
     public void testSubscribeDataEventTriggerReject() {
 

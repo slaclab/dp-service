@@ -178,7 +178,7 @@ public class QueryTableDispatcher extends Dispatcher {
             );
 
         } catch (DpException e) {
-            final String msg = "exception deserializing BucketDocument fields: " + e.getMessage();
+            final String msg = "exception building tabular result: " + e.getMessage();
             logger.error(msg);
             QueryServiceImpl.sendQueryTableResponseError(msg, this.responseObserver);
         }

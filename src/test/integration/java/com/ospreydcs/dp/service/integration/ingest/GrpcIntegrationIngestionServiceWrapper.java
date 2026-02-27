@@ -1,12 +1,12 @@
 package com.ospreydcs.dp.service.integration.ingest;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.ospreydcs.dp.client.IngestionClient;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.*;
 import com.ospreydcs.dp.service.common.bson.ProviderDocument;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.config.ConfigurationManager;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.model.TimestampMap;
@@ -31,6 +31,11 @@ import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Ingestion Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServiceWrapperBase<IngestionServiceImpl> {
 
     // static variables
@@ -58,10 +63,6 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
     ) {
     }
 
-    /**
-     * @param columnName               instance variables
-     * @param useSerializedDataColumns
-     */
     public record IngestionColumnInfo(
             String columnName,
             String requestIdBase,
@@ -70,7 +71,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
             int numBuckets,
             int numSecondsPerBucket,
             boolean useExplicitTimestampList,
-            boolean useSerializedDataColumns, List<String> tags,
+            List<String> tags,
             Map<String, String> attributes,
             String eventDescription,
             Long eventStartSeconds,
@@ -83,6 +84,22 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
     /**
      * @param providerId instance variables
      */
+    /**
+     * Helper method to safely convert a column document to DataColumn for testing purposes.
+     * Only scalar columns and DataColumnDocument can be converted to DataColumn.
+     * Returns null if the column cannot be converted (e.g., binary columns).
+     */
+    public static DataColumn tryConvertToDataColumn(ColumnDocumentBase columnDocument) throws DpException {
+        if (columnDocument instanceof ScalarColumnDocumentBase) {
+            return ((ScalarColumnDocumentBase<?>) columnDocument).toDataColumn();
+        } else if (columnDocument instanceof DataColumnDocument) {
+            return ((DataColumnDocument) columnDocument).toDataColumn();
+        } else {
+            // Binary columns cannot be converted to DataColumn
+            return null;
+        }
+    }
+
     public record IngestionBucketInfo(
             String providerId,
             String requestId,
@@ -94,14 +111,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
             long intervalNanos,
             List<Object> dataValues,
             List<Long> timestampSecondsList,
-            List<Long> timestampNanosList,
-            List<String> tags,
-            Map<String, String> attributes,
-            String eventDescription,
-            Long eventStartSeconds,
-            Long eventStartNanos,
-            Long eventStopSeconds,
-            Long eventStopNanos
+            List<Long> timestampNanosList
     ) {
     }
 
@@ -364,11 +374,22 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
 
     }
 
-    protected List<BucketDocument> verifyIngestionHandling(
+    /**
+     * Verifies ingestion handling for the provided (parallel-indexed) lists of params and requests. The requests were
+     * sent via a streaming API, which resulted in the single API response. Delegates verifying handling of individual
+     * ingestion requests to verifyIngestionRequestHandling().
+     *
+     * @param paramsList
+     * @param requestList
+     * @param response
+     * @param expectReject
+     * @param expectedRejectMessage
+     * @return
+     */
+    protected List<BucketDocument> verifyIngestionStreamHandling(
             List<IngestionTestBase.IngestionRequestParams> paramsList,
             List<IngestDataRequest> requestList,
             IngestDataStreamResponse response,
-            int numSerializedDataColumnsExpected,
             boolean expectReject,
             String expectedRejectMessage
     ) {
@@ -394,18 +415,28 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                 final IngestDataRequest request = requestList.get(listIndex);
 
                 // verify database contents (request status and corresponding bucket documents)
-                bucketDocumentList.addAll(verifyIngestionHandling(params, request, numSerializedDataColumnsExpected));
+                bucketDocumentList.addAll(verifyIngestionRequestHandling(
+                        params, request));
             }
         }
 
         return bucketDocumentList;
     }
 
+    /**
+     * Verifies that ingestion handling is successful for the supplied lists of params, requests, and responses.
+     * Those lists use parallel indexing to get the corresponding params, request, and response for each request in the
+     * list.  Delegates verifying individual request handling to verifyIngestionRequestHandling().
+     *
+     * @param paramsList
+     * @param requestList
+     * @param responseList
+     * @return
+     */
     protected List<BucketDocument> verifyIngestionHandling(
             List<IngestionTestBase.IngestionRequestParams> paramsList,
             List<IngestDataRequest> requestList,
-            List<IngestDataResponse> responseList,
-            int numSerializedDataColumnsExpected
+            List<IngestDataResponse> responseList
     ) {
         // check that parameter list sizes match
         assertEquals(paramsList.size(), requestList.size());
@@ -422,31 +453,42 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
             final IngestDataResponse response = responseList.get(listIndex);
 
             // verify API response
-            final int numPvs = params.columnNames.size();
+            final int numPvs = params.columnNames().size();
             assertTrue(response.hasAckResult());
             final IngestDataResponse.AckResult ackResult = response.getAckResult();
             assertEquals(numPvs, ackResult.getNumColumns());
-            assertEquals((int) params.samplingClockCount, ackResult.getNumRows());
+            assertEquals((int) params.samplingClockCount(), ackResult.getNumRows());
 
             // verify database contents (request status and corresponding bucket documents)
-            bucketDocumentList.addAll(verifyIngestionHandling(params, request, numSerializedDataColumnsExpected));
+            bucketDocumentList.addAll(verifyIngestionRequestHandling(params, request));
         }
 
         return bucketDocumentList;
     }
 
-    protected List<BucketDocument> verifyIngestionHandling(
+    /**
+     * Verifies ingestion handling for the supplied params object and the corresponding request.  First finds the
+     * RequestStatusDocument for the request and checks that it was successful.  Then looks for BucketDocuments in
+     * Mongo with the ids expected for the request.  For each BucketDocument, confirms that metadata is correct and
+     * verifies that column data matches the corresponding request column.  Convert's the BucketDocument's dataColumn to
+     * the corresponding protobuf column type for that column and then uses the protobuf column class's equals()
+     * method to compare the request column with the bucket document column, which compares both column name and values.
+     *
+     * @param params
+     * @param request
+     * @return
+     */
+    protected List<BucketDocument> verifyIngestionRequestHandling(
             IngestionTestBase.IngestionRequestParams params,
-            IngestDataRequest request,
-            int numSerializedDataColumnsExpected
+            IngestDataRequest request
     ) {
         // create container to hold method result
         final List<BucketDocument> bucketDocumentList = new ArrayList<>();
 
         // validate database RequestStatusDocument
-        final int numPvs = params.columnNames.size();
+        final int numPvs = params.columnNames().size();
         final RequestStatusDocument statusDocument =
-                mongoClient.findRequestStatus(params.providerId, params.requestId);
+                mongoClient.findRequestStatus(params.providerId(), params.requestId());
         assertNotNull(statusDocument);
         assertNotNull(statusDocument.getCreatedAt());
         assertEquals(
@@ -454,23 +496,22 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                 statusDocument.getRequestStatusCase());
         assertEquals(numPvs, statusDocument.getIdsCreated().size());
         final List<String> expectedBucketIds = new ArrayList<>();
-        for (String pvName : params.columnNames) {
+        for (String pvName : params.columnNames()) {
             final String expectedBucketId =
-                    pvName + "-" + params.samplingClockStartSeconds + "-" + params.samplingClockStartNanos;
+                    pvName + "-" + params.samplingClockStartSeconds() + "-" + params.samplingClockStartNanos();
             assertTrue(expectedBucketId, statusDocument.getIdsCreated().contains(expectedBucketId));
             expectedBucketIds.add(expectedBucketId);
         }
 
         // validate database BucketDocument for each column
         int pvIndex = 0;
-        int serializedDataColumnCount = 0;
         for (String expectedBucketId : expectedBucketIds) {
 
             final BucketDocument bucketDocument = mongoClient.findBucket(expectedBucketId);
             bucketDocumentList.add(bucketDocument);
 
             assertNotNull(bucketDocument);
-            final String pvName = params.columnNames.get(pvIndex);
+            final String pvName = params.columnNames().get(pvIndex);
             assertEquals(pvName, bucketDocument.getPvName());
             assertEquals(expectedBucketId, bucketDocument.getId());
 
@@ -479,30 +520,20 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
 
             // check bucket start times
             assertEquals(
-                    (long) params.samplingClockStartSeconds,
+                    (long) params.samplingClockStartSeconds(),
                     bucketDocument.getDataTimestamps().getFirstTime().getSeconds());
             assertEquals(
-                    (long) params.samplingClockStartNanos,
+                    (long) params.samplingClockStartNanos(),
                     bucketDocument.getDataTimestamps().getFirstTime().getNanos());
             assertEquals(
                     Date.from(Instant.ofEpochSecond(
-                            params.samplingClockStartSeconds, params.samplingClockStartNanos)),
+                            params.samplingClockStartSeconds(), params.samplingClockStartNanos())),
                     bucketDocument.getDataTimestamps().getFirstTime().getDateTime());
 
             // check sample count params
             assertEquals(
-                    (int) params.samplingClockCount,
+                    (int) params.samplingClockCount(),
                     bucketDocument.getDataTimestamps().getSampleCount());
-            DataColumn bucketDataColumn = null;
-            try {
-                bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
-            } catch (DpException e) {
-                throw new RuntimeException(e);
-            }
-            Objects.requireNonNull(bucketDataColumn);
-            assertEquals(
-                    (int) params.samplingClockCount,
-                    bucketDataColumn.getDataValuesList().size());
 
             // check DataTimestamps (TimestampsList or SamplingClock depending on request)
             DataTimestamps bucketDataTimestamps = null;
@@ -521,7 +552,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     requestDataTimestampsModel.getSamplePeriodNanos(),
                     bucketDocument.getDataTimestamps().getSamplePeriod());
 
-            if (params.timestampsSecondsList != null && !params.timestampsSecondsList.isEmpty()) {
+            if (params.timestampsSecondsList() != null && !params.timestampsSecondsList().isEmpty()) {
                 // check explicit TimestampsList
                 assertEquals(
                         DataTimestamps.ValueCase.TIMESTAMPLIST.getNumber(),
@@ -534,12 +565,12 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                 assertTrue(bucketDataTimestamps.hasTimestampList());
                 final List<Timestamp> bucketTimestampList =
                         bucketDataTimestamps.getTimestampList().getTimestampsList();
-                assertEquals(params.timestampsSecondsList.size(), bucketTimestampList.size());
-                assertEquals(params.timestampNanosList.size(), bucketTimestampList.size());
+                assertEquals(params.timestampsSecondsList().size(), bucketTimestampList.size());
+                assertEquals(params.timestampNanosList().size(), bucketTimestampList.size());
                 for (int timestampIndex = 0; timestampIndex < bucketTimestampList.size(); ++timestampIndex) {
                     final Timestamp bucketTimestamp = bucketTimestampList.get(timestampIndex);
-                    final long requestSeconds = params.timestampsSecondsList.get(timestampIndex);
-                    final long requestNanos = params.timestampNanosList.get(timestampIndex);
+                    final long requestSeconds = params.timestampsSecondsList().get(timestampIndex);
+                    final long requestNanos = params.timestampNanosList().get(timestampIndex);
                     assertEquals(requestSeconds, bucketTimestamp.getEpochSeconds());
                     assertEquals(requestNanos, bucketTimestamp.getNanoseconds());
                 }
@@ -562,101 +593,124 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     Date.from(Instant.ofEpochSecond(endSeconds, endNanos)),
                     bucketDocument.getDataTimestamps().getLastTime().getDateTime());
 
-            // compare data value vectors
-            DataColumn requestDataColumn = null;
+            // verify data column content for supported column data types
+            ColumnDocumentBase columnDocument = bucketDocument.getDataColumn();
 
-            if (params.useSerializedDataColumns) {
-                // request contains SerializedDataColumns
-                final List<SerializedDataColumn> serializedDataColumnList =
-                        request.getIngestionDataFrame().getSerializedDataColumnsList();
-                final SerializedDataColumn serializedDataColumn = serializedDataColumnList.get(pvIndex);
-                // deserialize column for comparison
-                try {
-                    requestDataColumn = DataColumn.parseFrom(serializedDataColumn.getDataColumnBytes());
-                } catch (InvalidProtocolBufferException e) {
-                    fail("exception deserializing DataColumn: " + e.getMessage());
-                }
-                serializedDataColumnCount = serializedDataColumnCount + 1;
-
+            // Convert columnDocument to protobuf column format and match it against appropriate column type
+            // from request. This finds a match using equals() for the protobuf column type, which compares the
+            // column name and the column values (confirmed in debugger).
+            if (columnDocument instanceof DataColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getDataColumnsList().contains(
+                                (DataColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof DoubleColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getDoubleColumnsList().contains(
+                                (DoubleColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof FloatColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getFloatColumnsList().contains(
+                                (FloatColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof Int64ColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getInt64ColumnsList().contains(
+                                (Int64Column) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof Int32ColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getInt32ColumnsList().contains(
+                                (Int32Column) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof BoolColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getBoolColumnsList().contains(
+                                (BoolColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof StringColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getStringColumnsList().contains(
+                                (StringColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof EnumColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getEnumColumnsList().contains(
+                                (EnumColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof DoubleArrayColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getDoubleArrayColumnsList().contains(
+                                (DoubleArrayColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof FloatArrayColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getFloatArrayColumnsList().contains(
+                                (FloatArrayColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof Int32ArrayColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getInt32ArrayColumnsList().contains(
+                                (Int32ArrayColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof Int64ArrayColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getInt64ArrayColumnsList().contains(
+                                (Int64ArrayColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof BoolArrayColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getBoolArrayColumnsList().contains(
+                                (BoolArrayColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof StructColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getStructColumnsList().contains(
+                                (StructColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof ImageColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getImageColumnsList().contains(
+                                (ImageColumn) columnDocument.toProtobufColumn()));
+            } else if (columnDocument instanceof SerializedDataColumnDocument) {
+                assertTrue(
+                        request.getIngestionDataFrame().getSerializedDataColumnsList().contains(
+                                (SerializedDataColumn) columnDocument.toProtobufColumn()));
             } else {
-                // request contains regular DataColumns
-                final List<DataColumn> dataColumnList = request.getIngestionDataFrame().getDataColumnsList();
-                requestDataColumn = dataColumnList.get(pvIndex);
-            }
-            // this compares each DataValue including ValueStatus, confirmed in debugger
-            assertEquals(requestDataColumn, bucketDataColumn);
-
-            // check tags
-            if (params.tags != null) {
-                assertEquals(params.tags, bucketDocument.getTags());
-            } else {
-                assertTrue(bucketDocument.getTags() == null || bucketDocument.getTags().isEmpty());
-            }
-
-            // check attributes
-            if (params.attributes != null) {
-                assertEquals(params.attributes, bucketDocument.getAttributes());
-            } else {
-                assertTrue(bucketDocument.getAttributes() == null || bucketDocument.getAttributes().isEmpty());
-            }
-
-            // check event metadata
-            if (params.eventDescription != null) {
-                assertNotNull(bucketDocument.getEvent());
-                assertEquals(request.getEventMetadata(), bucketDocument.getEvent().toEventMetadata());
-            } else {
-                assertNull(bucketDocument.getEvent());
+                fail("unexpected columnDocument type: " + columnDocument);
             }
 
             pvIndex = pvIndex + 1;
         }
-        assertEquals(numSerializedDataColumnsExpected, serializedDataColumnCount);
 
         return bucketDocumentList;
     }
 
-    protected List<BucketDocument> sendAndVerifyIngestData(
+    public List<BucketDocument> sendAndVerifyIngestData(
             IngestionTestBase.IngestionRequestParams params,
-            IngestDataRequest ingestionRequest,
-            int numSerializedDataColumnsExpected
+            IngestDataRequest ingestionRequest
     ) {
         final IngestDataResponse response = sendIngestData(ingestionRequest);
         final List<IngestionTestBase.IngestionRequestParams> paramsList = Arrays.asList(params);
         final List<IngestDataRequest> requestList = Arrays.asList(ingestionRequest);
         final List<IngestDataResponse> responseList = Arrays.asList(response);
-        return verifyIngestionHandling(paramsList, requestList, responseList, numSerializedDataColumnsExpected);
+        return verifyIngestionHandling(paramsList, requestList, responseList);
     }
 
     public List<BucketDocument> sendAndVerifyIngestDataStream(
             List<IngestionTestBase.IngestionRequestParams> paramsList,
             List<IngestDataRequest> requestList,
-            int numSerializedDataColumnsExpected,
             boolean expectReject,
             String expectedRejectMessage
     ) {
 
         // send request
         final IngestDataStreamResponse response = sendIngestDataStream(requestList);
-        return verifyIngestionHandling(
+        return verifyIngestionStreamHandling(
                 paramsList,
                 requestList,
                 response,
-                numSerializedDataColumnsExpected,
                 expectReject,
                 expectedRejectMessage);
     }
 
     protected List<BucketDocument> sendAndVerifyIngestDataBidiStream(
             IngestionTestBase.IngestionRequestParams params,
-            IngestDataRequest ingestionRequest,
-            int numSerializedDataColumnsExpected
+            IngestDataRequest ingestionRequest
     ) {
 
         // send request
         final List<IngestionTestBase.IngestionRequestParams> paramsList = Arrays.asList(params);
         final List<IngestDataRequest> requestList = Arrays.asList(ingestionRequest);
         final List<IngestDataResponse> responseList = sendIngestDataBidiStream(requestList);
-        return verifyIngestionHandling(paramsList, requestList, responseList, numSerializedDataColumnsExpected);
+        return verifyIngestionHandling(paramsList, requestList, responseList);
     }
 
     protected IngestionStreamInfo ingestDataBidiStream(
@@ -719,8 +773,6 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     new IngestionTestBase.IngestionRequestParams(
                             columnInfo.providerId,
                             requestId,
-                            null,
-                            null,
                             timestampSecondsList, // if not null, request will use explicit TimestampsList in DataTimestamps
                             timestampNanosList,
                             currentSeconds,
@@ -730,15 +782,8 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                             List.of(columnName),
                             IngestionTestBase.IngestionDataType.DOUBLE,
                             columnValues,
-                            columnInfo.tags,
-                            columnInfo.attributes,
-                            columnInfo.eventDescription,
-                            columnInfo.eventStartSeconds,
-                            columnInfo.eventStartNanos,
-                            columnInfo.eventStopSeconds,
-                            columnInfo.eventStopNanos,
-                            columnInfo.useSerializedDataColumns
-                    );
+                            null,
+                            null);
             paramsList.add(params);
 
             final Instant startTimeInstant = Instant.ofEpochSecond(currentSeconds, startNanos);
@@ -759,14 +804,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                             bucketInfoSamplePeriod,
                             dataValuesList,
                             timestampSecondsList,
-                            timestampNanosList,
-                            columnInfo.tags,
-                            columnInfo.attributes,
-                            columnInfo.eventDescription,
-                            columnInfo.eventStartSeconds,
-                            columnInfo.eventStartNanos,
-                            columnInfo.eventStopSeconds,
-                            columnInfo.eventStopNanos
+                            timestampNanosList
                     );
             bucketInfoMap.put(currentSeconds, startNanos, bucketInfo);
 
@@ -793,8 +831,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
     public Map<String, IngestionStreamInfo> ingestDataBidiStreamFromColumn(
             List<IngestionColumnInfo> columnInfoList,
             long startSeconds,
-            long startNanos,
-            int numSerializedDataColumnsExpected
+            long startNanos
     ) {
         // create data structure for validating query result
         Map<String, IngestionStreamInfo> validationMap = new TreeMap<>();
@@ -808,8 +845,8 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
             verifyIngestionHandling(
                     streamInfo.paramsList,
                     streamInfo.requestList,
-                    streamInfo.responseList,
-                    numSerializedDataColumnsExpected);
+                    streamInfo.responseList
+            );
             validationMap.put(columnInfo.columnName, streamInfo);
         }
 
@@ -867,7 +904,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                                 numBuckets,
                                 numSecondsPerBucket,
                                 false,
-                                false, tags,
+                                tags,
                                 attributes,
                                 eventDescription,
                                 eventStartSeconds,
@@ -893,7 +930,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                                 interval,
                                 numBuckets,
                                 numSecondsPerBucket,
-                                false, false, null, null, null, null, null, null, null);
+                                false, null, null, null, null, null, null, null);
                 bpmPvNames.add(bpmName);
                 ingestionColumnInfoList.add(columnInfoTenths);
             }
@@ -923,7 +960,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
         Map<String, IngestionStreamInfo> validationMap = null;
         {
             // perform ingestion for specified list of columns
-            validationMap = ingestDataBidiStreamFromColumn(ingestionColumnInfoList, startSeconds, startNanos, 0);
+            validationMap = ingestDataBidiStreamFromColumn(ingestionColumnInfoList, startSeconds, startNanos);
         }
 
         return new IngestionScenarioResult(providerInfoMap, validationMap);
@@ -1025,7 +1062,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
         return sendSubscribeData(request, expectedResponseCount, expectReject, expectedRejectMessage);
     }
 
-    protected SubscribeDataUtility.SubscribeDataCall initiateSubscribeDataRequest(
+    public SubscribeDataUtility.SubscribeDataCall initiateSubscribeDataRequest(
             List<String> pvNameList,
             int expectedResponseCount,
             boolean expectReject,
@@ -1060,8 +1097,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
     protected void verifySubscribeDataResponse(
             IngestionTestBase.SubscribeDataResponseObserver responseObserver,
             List<String> pvNameList,
-            Map<String, IngestionStreamInfo> ingestionValidationMap,
-            int numExpectedSerializedColumns
+            Map<String, IngestionStreamInfo> ingestionValidationMap
     ) {
         // wait for completion of API method response stream and confirm not in error state
         responseObserver.awaitResponseLatch();
@@ -1077,33 +1113,55 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
 
             assertTrue(response.hasSubscribeDataResult());
             final SubscribeDataResponse.SubscribeDataResult responseResult = response.getSubscribeDataResult();
-            final DataTimestamps responseDataTimestamps = responseResult.getDataTimestamps();
-            final DataTimestampsUtility.DataTimestampsModel responseTimestampsModel = 
-                    new DataTimestampsUtility.DataTimestampsModel(responseDataTimestamps);
-            final long responseSeconds = responseTimestampsModel.getFirstTimestamp().getEpochSeconds();
-            final long responseNanos = responseTimestampsModel.getFirstTimestamp().getNanoseconds();
 
-            // add entries to pvTimestampColumnMap for regular DataColumns in response
-            for (DataColumn dataColumn : responseResult.getDataColumnsList()) {
-                addPvTimestampColumnMapEntry(
-                        pvTimestampColumnMap, responseSeconds, responseNanos, dataColumn, false);
-                responseColumnCount = responseColumnCount + 1;
-            }
+            for (DataBucket dataBucket : responseResult.getDataBucketsList()) {
 
-            // add entries to pvTimestampColumnMap for SerializedDataColumns in response
-            for (SerializedDataColumn serializedDataColumn : responseResult.getSerializedDataColumnsList()) {
-                DataColumn deserializedDataColumn = null;
-                try {
-                    deserializedDataColumn = DataColumn.parseFrom(serializedDataColumn.getDataColumnBytes());
-                } catch (InvalidProtocolBufferException e) {
-                    fail("exception deserializing response SerializedDataColumn: " + e.getMessage());
+                final DataTimestamps responseDataTimestamps = dataBucket.getDataTimestamps();
+                final DataTimestampsUtility.DataTimestampsModel responseTimestampsModel =
+                        new DataTimestampsUtility.DataTimestampsModel(responseDataTimestamps);
+                final long responseSeconds = responseTimestampsModel.getFirstTimestamp().getEpochSeconds();
+                final long responseNanos = responseTimestampsModel.getFirstTimestamp().getNanoseconds();
+
+                switch (dataBucket.getDataValues().getValuesCase()) {
+                    case DATACOLUMN -> {
+                        // add entries to pvTimestampColumnMap for regular DataColumns in response
+                        final DataColumn dataColumn = dataBucket.getDataValues().getDataColumn();
+                        addPvTimestampColumnMapEntry(
+                                pvTimestampColumnMap, responseSeconds, responseNanos, dataColumn, false);
+                        responseColumnCount = responseColumnCount + 1;
+                    }
+                    case SERIALIZEDDATACOLUMN -> {
+                    }
+                    case DOUBLECOLUMN -> {
+                    }
+                    case FLOATCOLUMN -> {
+                    }
+                    case INT64COLUMN -> {
+                    }
+                    case INT32COLUMN -> {
+                    }
+                    case BOOLCOLUMN -> {
+                    }
+                    case STRINGCOLUMN -> {
+                    }
+                    case ENUMCOLUMN -> {
+                    }
+                    case IMAGECOLUMN -> {
+                    }
+                    case STRUCTCOLUMN -> {
+                    }
+                    case DOUBLEARRAYCOLUMN -> {
+                    }
+                    case FLOATARRAYCOLUMN -> {
+                    }
+                    case INT32ARRAYCOLUMN -> {
+                    }
+                    case INT64ARRAYCOLUMN -> {
+                    }
+                    case BOOLARRAYCOLUMN -> {
+                    }
                 }
-                assertNotNull(deserializedDataColumn);
-                addPvTimestampColumnMapEntry(
-                        pvTimestampColumnMap, responseSeconds, responseNanos, deserializedDataColumn, true);
-                responseColumnCount = responseColumnCount + 1;
             }
-
         }
 
         // confirm that we received the expected DataColumns in subscription responses
@@ -1114,7 +1172,7 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
             for (IngestDataRequest pvIngestionRequest : ingestionValidationMap.get(pvName).requestList) {
 
                 // check that pvTimestampColumnMap contains an entry for each PV column in request's data frame
-                final IngestDataRequest.IngestionDataFrame requestFrame = pvIngestionRequest.getIngestionDataFrame();
+                final DataFrame requestFrame = pvIngestionRequest.getIngestionDataFrame();
                 final DataTimestamps requestDataTimestamps = requestFrame.getDataTimestamps();
                 final DataTimestampsUtility.DataTimestampsModel requestTimestampsModel = 
                         new DataTimestampsUtility.DataTimestampsModel(requestDataTimestamps);
@@ -1138,26 +1196,9 @@ public class GrpcIntegrationIngestionServiceWrapper extends GrpcIntegrationServi
                     assertFalse(responseColumnIsSerialized);
                     requestColumnCount = requestColumnCount + 1;
                 }
-
-                for (SerializedDataColumn requestSerializedColumn : requestFrame.getSerializedDataColumnsList()) {
-                    // ignore ingestion request columns not for this PV, which shouldn't be the case, but...
-                    if ( ! requestSerializedColumn.getName().equals(pvName)) {
-                        continue;
-                    }
-                    try {
-                        assertEquals(DataColumn.parseFrom(requestSerializedColumn.getDataColumnBytes()), responseDataColumn);
-                    } catch (InvalidProtocolBufferException e) {
-                        fail("exception deserializing request SerializedDatacolumn: " + e.getMessage());
-                    }
-                    assertTrue(responseColumnIsSerialized);
-                    requestColumnCount = requestColumnCount + 1;
-                    serializedColumnCount = serializedColumnCount + 1;
-                }
-
             }
         }
         assertEquals(requestColumnCount, responseColumnCount);
-        assertEquals(numExpectedSerializedColumns, serializedColumnCount);
     }
 
     protected void cancelSubscribeDataCall(SubscribeDataUtility.SubscribeDataCall subscribeDataCall) {

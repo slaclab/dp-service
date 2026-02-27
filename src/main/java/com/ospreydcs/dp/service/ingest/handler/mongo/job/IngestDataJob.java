@@ -5,12 +5,12 @@ import com.mongodb.client.result.InsertOneResult;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
+import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.handler.HandlerJob;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionRequest;
 import com.ospreydcs.dp.service.ingest.handler.model.HandlerIngestionResult;
 import com.ospreydcs.dp.service.ingest.handler.mongo.client.MongoIngestionClientInterface;
 import com.ospreydcs.dp.service.ingest.handler.mongo.MongoIngestionHandler;
-import com.ospreydcs.dp.service.ingest.model.DpIngestionException;
 import com.ospreydcs.dp.service.ingest.model.IngestionRequestStatus;
 import com.ospreydcs.dp.service.ingest.model.IngestionTaskResult;
 import org.apache.logging.log4j.LogManager;
@@ -18,6 +18,10 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 
+/**
+ * This class is created to service an IngestDataRequest received by one of the data ingestion API methods. The
+ * execute() method is dispatched to handleIngestionRequest(), which does the core work of the Ingestion Service.
+ */
 public class IngestDataJob extends HandlerJob {
 
     // static variables
@@ -43,6 +47,15 @@ public class IngestDataJob extends HandlerJob {
         this.handleIngestionRequest(request);
     }
 
+    /**
+     * Handles an IngestDataRequest received by one of the data ingestion API methods.  Checks that specified providerId
+     * is valid by database lookup. Generates a batch of BSON BucketDocuments, one for each data column in the request.
+     * Inserts the batch of documents to MongoDB, and verifies handling. Inserts a RequestStatusDocument in MongoDB for
+     * checking the status of the request asynchronously.  Publishes data columns for subscribed PVs.
+     *
+     * @param handlerIngestionRequest
+     * @return
+     */
     public HandlerIngestionResult handleIngestionRequest(HandlerIngestionRequest handlerIngestionRequest) {
 
         final IngestDataRequest request = handlerIngestionRequest.request;
@@ -77,7 +90,7 @@ public class IngestDataJob extends HandlerJob {
                 List<BucketDocument> dataDocumentBatch = null;
                 try {
                     dataDocumentBatch = BucketDocument.generateBucketsFromRequest(request, providerName);
-                } catch (DpIngestionException e) {
+                } catch (DpException e) {
                     isError = true;
                     errorMsg = e.getMessage();
                     status = IngestionRequestStatus.ERROR;
@@ -106,8 +119,7 @@ public class IngestDataJob extends HandlerJob {
                         } else {
 
                             long recordsInsertedCount = insertManyResult.getInsertedIds().size();
-                            long recordsExpected = request.getIngestionDataFrame().getDataColumnsCount()
-                                    + request.getIngestionDataFrame().getSerializedDataColumnsCount();
+                            long recordsExpected = dataDocumentBatch.size();
 
                             if (recordsInsertedCount != recordsExpected) {
                                 // check records inserted matches expected
@@ -157,7 +169,7 @@ public class IngestDataJob extends HandlerJob {
 
         // publish request PV data to subscribeData() subscribers
         if (! isError) {
-            handler.getSourceMonitorPublisher().publishDataSubscriptions(request);
+            handler.getSourceMonitorPublisher().publishDataSubscriptions(request, providerName);
         }
 
         return new HandlerIngestionResult(isError, errorMsg);

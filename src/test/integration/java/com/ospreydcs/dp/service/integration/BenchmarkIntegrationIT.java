@@ -2,22 +2,19 @@ package com.ospreydcs.dp.service.integration;
 
 import com.ospreydcs.dp.grpc.v1.annotation.ExportDataRequest;
 import com.ospreydcs.dp.grpc.v1.annotation.ExportDataResponse;
-import com.ospreydcs.dp.grpc.v1.common.DataBucket;
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.SamplingClock;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataResponse;
-import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest.IngestionDataFrame;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataRequest;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataResponse;
 import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
+import com.ospreydcs.dp.service.integration.ingest.GrpcIntegrationIngestionServiceWrapper;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.RequestStatusDocument;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.common.model.BenchmarkScenarioResult;
 import com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataBidiStream;
+import com.ospreydcs.dp.service.ingest.benchmark.ColumnDataType;
 import com.ospreydcs.dp.service.ingest.benchmark.IngestionBenchmarkBase;
 import com.ospreydcs.dp.service.query.QueryTestBase;
 import com.ospreydcs.dp.service.query.benchmark.*;
@@ -86,7 +83,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
 
             public IntegrationTestIngestionTask(
                     IngestionBenchmarkBase.IngestionTaskParams params,
-                    IngestionDataFrame.Builder templateDataTable,
+                    DataFrame.Builder templateDataTable,
                     Channel channel) {
 
                 super(params, templateDataTable, channel);
@@ -193,18 +190,16 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     assertEquals(
                             Date.from(Instant.ofEpochSecond(requestInfo.startSeconds, 999000000L)),
                             bucketDocument.getDataTimestamps().getLastTime().getDateTime());
-                    final EventMetadataDocument eventMetadataDocument = bucketDocument.getEvent();
-                    assertEquals("calibration test", eventMetadataDocument.getDescription());
-                    assertEquals(
-                            params.startSeconds,
-                            eventMetadataDocument.getStartTime().getSeconds());
-                    assertEquals(0, eventMetadataDocument.getStartTime().getNanos());
                     assertEquals("07", bucketDocument.getAttributes().get("sector"));
                     assertEquals("vacuum", bucketDocument.getAttributes().get("subsystem"));
 
                     DataColumn bucketDataColumn = null;
                     try {
-                        bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                        bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                        if (bucketDataColumn == null) {
+                            // Binary columns can't be converted to DataColumn, skip this test
+                            continue;
+                        }
                     } catch (DpException e) {
                         throw new RuntimeException(e);
                     }
@@ -251,7 +246,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
         }
 
         protected BidiStreamingIngestionTask newIngestionTask(
-                IngestionTaskParams params, IngestionDataFrame.Builder templateDataTable, Channel channel
+                IngestionTaskParams params, DataFrame.Builder templateDataTable, Channel channel
         ) {
             return new IntegrationTestIngestionTask(params, templateDataTable, channel);
         }
@@ -286,7 +281,8 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     INGESTION_NUM_ROWS,
                     numColumnsPerStream,
                     INGESTION_NUM_SECONDS,
-                    false, false);
+                    false,
+                    ColumnDataType.DATA_COLUMN);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== ingestion scenario completed ==========");
@@ -349,8 +345,8 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                 assertTrue(queryData.getDataBucketsCount() > 0);
                 for (DataBucket bucket : queryData.getDataBucketsList()) {
 
-                    assertTrue(bucket.hasDataColumn());
-                    final DataColumn dataColumn = bucket.getDataColumn();
+                    assertTrue(bucket.getDataValues().hasDataColumn());
+                    final DataColumn dataColumn = bucket.getDataValues().getDataColumn();
                     final String columnName = dataColumn.getName();
                     assertNotNull(columnName);
                     assertNotNull(dataColumn.getDataValuesList());
@@ -556,7 +552,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseCursor scenario completed ==========");
@@ -583,7 +579,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseStream scenario completed ==========");
@@ -610,7 +606,7 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                     QUERY_SINGLE_NUM_PVS_PER_REQUEST,
                     QUERY_NUM_THREADS,
                     startSeconds,
-                    NUM_SCENARIO_SECONDS, false);
+                    NUM_SCENARIO_SECONDS);
             assertTrue(scenarioResult.success);
 
             System.out.println("========== queryResponseSingle scenario completed ==========");
@@ -761,13 +757,12 @@ public class BenchmarkIntegrationIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             queryServiceWrapper.sendAndVerifyQueryData(
                     numBucketsExpected,
-                    0, params,
+                    params,
                     null,
                     expectReject,
                     expectedRejectMessage

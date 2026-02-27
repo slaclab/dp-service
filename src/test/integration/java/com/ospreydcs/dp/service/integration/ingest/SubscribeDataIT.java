@@ -199,18 +199,18 @@ public class SubscribeDataIT extends GrpcIntegrationTestBase {
             ingestionServiceWrapper.verifySubscribeDataResponse(
                     (IngestionTestBase.SubscribeDataResponseObserver) subscribeDataCall1.responseObserver(),
                     subscriptionPvNames1,
-                    ingestionScenarioResult.validationMap(),
-                    0);
+                    ingestionScenarioResult.validationMap()
+            );
             ingestionServiceWrapper.verifySubscribeDataResponse(
                     (IngestionTestBase.SubscribeDataResponseObserver) subscribeDataCall2.responseObserver(),
                     subscriptionPvNames2,
-                    ingestionScenarioResult.validationMap(),
-                    0);
+                    ingestionScenarioResult.validationMap()
+            );
             ingestionServiceWrapper.verifySubscribeDataResponse(
                     (IngestionTestBase.SubscribeDataResponseObserver) subscribeDataCall3.responseObserver(),
                     subscriptionPvNames3,
-                    ingestionScenarioResult.validationMap(),
-                    0);
+                    ingestionScenarioResult.validationMap()
+            );
 
             // 2) cancel subscription with explicit cancel message
             ingestionServiceWrapper.cancelSubscribeDataCall(subscribeDataCall2);

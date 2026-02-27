@@ -77,8 +77,6 @@ public class IngestDataBidiStreamExplicitTimestampListIT extends GrpcIntegration
                         new IngestionTestBase.IngestionRequestParams(
                                 providerId,
                                 requestId,
-                                null,
-                                null,
                                 timestampsSecondsList,
                                 timestampNanosList,
                                 requestSeconds,
@@ -87,7 +85,7 @@ public class IngestDataBidiStreamExplicitTimestampListIT extends GrpcIntegration
                                 numSamples, // each DataColumn must contain 5 DataValues
                                 pvNames,
                                 IngestionTestBase.IngestionDataType.DOUBLE,
-                                values, null, false);
+                                values, null, null);
 
                 // build ingestion request
                 final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
@@ -98,7 +96,7 @@ public class IngestDataBidiStreamExplicitTimestampListIT extends GrpcIntegration
 
                 // verify ingestion
                 final List<IngestionTestBase.IngestionRequestParams> paramsList = Arrays.asList(params);
-                ingestionServiceWrapper.verifyIngestionHandling(paramsList, requestList, responseList, 0);
+                ingestionServiceWrapper.verifyIngestionHandling(paramsList, requestList, responseList);
             }
         }
     }

@@ -208,8 +208,7 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                                             queryBeginSeconds,
                                             queryBeginNanos,
                                             queryEndSeconds,
-                                            queryEndNanos,
-                                            false
+                                            queryEndNanos
                                     );
 
                             final List<DataBucket> queryResultBuckets =
@@ -219,7 +218,7 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                                 boolean foundPvBucket = false;
                                 DataBucket matchingResponseBucket = null;
                                 for (DataBucket responseBucket : queryResultBuckets) {
-                                    if (Objects.equals(pvName, responseBucket.getDataColumn().getName())) {
+                                    if (Objects.equals(pvName, responseBucket.getDataValues().getDataColumn().getName())) {
                                         foundPvBucket = true;
                                         matchingResponseBucket = responseBucket;
                                         break;
@@ -268,23 +267,6 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                     expectReject,
                     expectedRejectMessage,
                     createAnnotationScenarioResult.expectedQueryByNameAnnotations());
-        }
-
-        // queryAnnotations() positive test for query by TextCriterion (over eventMetadata.description field).
-        {
-            final String eventDescriptionText = "1234";
-            final AnnotationTestBase.QueryAnnotationsParams queryParams =
-                    new AnnotationTestBase.QueryAnnotationsParams();
-            queryParams.setTextCriterion(eventDescriptionText);
-
-            final boolean expectReject = false;
-            final String expectedRejectMessage ="";
-
-            annotationServiceWrapper.sendAndVerifyQueryAnnotations(
-                    queryParams,
-                    expectReject,
-                    expectedRejectMessage,
-                    List.of(createAnnotationScenarioResult.annotationWithAllFieldsParams()));
         }
 
         // queryAnnotations() positive test for query by AnnotationCriterion (by id of related annotation).
@@ -353,7 +335,6 @@ public class QueryAnnotationsIT extends AnnotationIntegrationTestIntermediate {
                             "updated annotation",
                             createParams.tags,
                             createParams.attributeMap,
-                            createParams.eventMetadataParams,
                             createParams.calculations
                     );
             annotationServiceWrapper.sendAndVerifySaveAnnotation(

@@ -1,33 +1,24 @@
-package com.ospreydcs.dp.service.common.bson;
+package com.ospreydcs.dp.service.common.bson.column;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataValue;
-import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
-import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
+import com.google.protobuf.Message;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
-public class DataColumnDocument {
+@BsonDiscriminator(key = "_t", value = "dataColumn")
+public class DataColumnDocument extends ColumnDocumentBase {
 
     // static variables
     private static final Logger logger = LogManager.getLogger();
 
     // instance variables
-    private String name;
     private int valueCase;
     private String valueType;
     private byte[] bytes = null;
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public int getValueCase() {
         return valueCase;
@@ -57,6 +48,20 @@ public class DataColumnDocument {
         this.bytes = dataColumn.toByteArray();
     }
 
+    @Override
+    public Message toProtobufColumn() {
+        if (this.bytes != null) {
+            try {
+                return DataColumn.parseFrom(this.bytes);
+            } catch (InvalidProtocolBufferException e) {
+                logger.error("protobuf parsing error", e);
+                // Return empty DataColumn as fallback
+                return DataColumn.newBuilder().setName(getName() != null ? getName() : "").build();
+            }
+        }
+        return DataColumn.newBuilder().setName(getName() != null ? getName() : "").build();
+    }
+
     public static DataColumnDocument fromDataColumn(DataColumn requestDataColumn) {
         DataColumnDocument document = new DataColumnDocument();
         document.setName(requestDataColumn.getName());
@@ -69,14 +74,6 @@ public class DataColumnDocument {
         return document;
     }
 
-    public static DataColumnDocument fromSerializedDataColumn(
-            SerializedDataColumn column
-    ) {
-        DataColumnDocument document = new DataColumnDocument();
-        document.setName(column.getName());
-        document.setBytes(column.getDataColumnBytes().toByteArray());
-        return document;
-    }
 
     public DataColumn toDataColumn() throws DpException {
 
@@ -99,9 +96,16 @@ public class DataColumnDocument {
     public SerializedDataColumn toSerializedDataColumn() throws DpException {
         final SerializedDataColumn.Builder serializedDataColumnBuilder = SerializedDataColumn.newBuilder();
         if (this.bytes != null) {
-            serializedDataColumnBuilder.setDataColumnBytes(ByteString.copyFrom(this.getBytes()));
+            serializedDataColumnBuilder.setPayload(ByteString.copyFrom(this.toByteArray()));
         }
         serializedDataColumnBuilder.setName(this.getName());
         return serializedDataColumnBuilder.build();
+    }
+
+    @Override
+    public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
+        DataColumn dataColumn = this.toDataColumn();
+        DataValues dataValues = DataValues.newBuilder().setDataColumn(dataColumn).build();
+        bucketBuilder.setDataValues(dataValues);
     }
 }

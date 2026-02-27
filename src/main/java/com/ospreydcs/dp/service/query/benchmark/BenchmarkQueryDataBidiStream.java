@@ -173,7 +173,7 @@ public class BenchmarkQueryDataBidiStream extends QueryBenchmarkBase {
         final int[] numThreadsArray = {7};
 
         BenchmarkQueryDataBidiStream benchmark = new BenchmarkQueryDataBidiStream();
-        runBenchmark(benchmark, totalNumPvsArray, numPvsPerRequestArray, numThreadsArray, false);
+        runBenchmark(benchmark, totalNumPvsArray, numPvsPerRequestArray, numThreadsArray);
     }
 
 }

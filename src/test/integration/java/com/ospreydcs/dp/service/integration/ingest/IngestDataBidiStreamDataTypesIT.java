@@ -14,7 +14,7 @@ public class IngestDataBidiStreamDataTypesIT extends IngestDataTypesTestBase {
             IngestionTestBase.IngestionRequestParams params,
             IngestDataRequest ingestionRequest
     ) {
-        return ingestionServiceWrapper.sendAndVerifyIngestDataBidiStream(params, ingestionRequest, 0);
+        return ingestionServiceWrapper.sendAndVerifyIngestDataBidiStream(params, ingestionRequest);
     }
 
     @Before

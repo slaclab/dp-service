@@ -81,10 +81,10 @@ public class QueryDataResponseObserver implements StreamObserver<QueryDataRespon
             for (DataBucket bucket : queryData.getDataBucketsList()) {
 
                 int dataValuesCount = 0;
-                if (bucket.hasDataColumn()) {
-                    dataValuesCount = bucket.getDataColumn().getDataValuesCount();
+                if (bucket.getDataValues().hasDataColumn()) {
+                    dataValuesCount = bucket.getDataValues().getDataColumn().getDataValuesCount();
 
-                } else if (bucket.hasSerializedDataColumn()) {
+                } else if (bucket.getDataValues().hasSerializedDataColumn()) {
 
                     if (bucket.getDataTimestamps().hasSamplingClock()) {
                         dataValuesCount = bucket.getDataTimestamps().getSamplingClock().getCount();

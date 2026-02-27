@@ -55,12 +55,7 @@ public class QueryPvMetadataDispatcher extends Dispatcher {
             pvInfoBuilder.setPvName(metadataDocument.getPvName());
             pvInfoBuilder.setLastBucketId(metadataDocument.getLastBucketId());
 
-            // last data type case and type
-            final Integer lastDataTypeCase =
-                    metadataDocument.getLastBucketDataTypeCase();
-            if (lastDataTypeCase != null) {
-                pvInfoBuilder.setLastBucketDataTypeCase(lastDataTypeCase);
-            }
+            // last data type
             final String lastDataType = metadataDocument.getLastBucketDataType();
             if (lastDataType != null) {
                 pvInfoBuilder.setLastBucketDataType(lastDataType);

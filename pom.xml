@@ -10,7 +10,7 @@
     <groupId>com.ospreydcs</groupId>
     <artifactId>dp-service</artifactId>
     <packaging>jar</packaging>
-    <version>1.12.0</version>
+    <version>1.13.0</version>
 
     <properties>
 
@@ -22,7 +22,7 @@
 
         <main.basedir>${project.basedir}</main.basedir>
 
-        <dp-grpc.version>1.12.0</dp-grpc.version>
+        <dp-grpc.version>1.13.0</dp-grpc.version>
         <mongodb.version>5.4.0</mongodb.version>
         <log4j-version>2.23.1</log4j-version>
         <snakeyaml.version>2.2</snakeyaml.version>

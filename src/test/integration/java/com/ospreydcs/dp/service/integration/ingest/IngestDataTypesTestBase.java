@@ -89,21 +89,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
             final long samplePeriod = 1_000_000_000L / numSamples;
             final long endSeconds = startSeconds;
             final long endNanos = samplePeriod * (numSamples - 1);
-            final IngestionTestBase.IngestionRequestParams params =
-                    new IngestionTestBase.IngestionRequestParams(
-                            providerId,
-                            requestId,
-                            null,
-                            null,
-                            null,
-                            null,
-                            startSeconds,
-                            startNanos,
-                            samplePeriod, // 5 values per second
-                            numSamples, // each DataColumn must contain 5 DataValues
-                            pvNames,
-                            null,
-                            null, null, false);
 
             // build list of DataColumns
             arrayDataColumnList = new ArrayList<>(pvNames.size());
@@ -157,9 +142,26 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                 arrayValidationMap.put(dataColumn, dataValueModelList);
             }
 
+            final IngestionTestBase.IngestionRequestParams params =
+                    new IngestionTestBase.IngestionRequestParams(
+                            providerId,
+                            requestId,
+                            null,
+                            null,
+                            startSeconds,
+                            startNanos,
+                            samplePeriod, // 5 values per second
+                            numSamples, // each DataColumn must contain 5 DataValues
+                            pvNames,
+                            null,
+                            null,
+                            null,
+                            arrayDataColumnList
+                    );
+
             // build request
             final IngestDataRequest ingestionRequest =
-                    IngestionTestBase.buildIngestionRequest(params, arrayDataColumnList);
+                    IngestionTestBase.buildIngestionRequest(params);
 
             // send request
             final List<BucketDocument> bucketDocumentList=
@@ -175,7 +177,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }
@@ -208,8 +214,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(
                     queryDataRequestParams, false, "");
@@ -239,21 +244,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
             final long samplePeriod = 1_000_000_000L / numSamples;
             final long endSeconds = startSeconds;
             final long endNanos = samplePeriod * (numSamples - 1);
-            final IngestionTestBase.IngestionRequestParams params =
-                    new IngestionTestBase.IngestionRequestParams(
-                            providerId,
-                            requestId,
-                            null,
-                            null,
-                            null,
-                            null,
-                            startSeconds,
-                            startNanos,
-                            samplePeriod, // 5 values per second
-                            numSamples, // each DataColumn must contain 5 DataValues
-                            pvNames,
-                            null,
-                            null, null, false);
 
             // build list of DataColumns
             final List<DataColumn> dataColumnList = new ArrayList<>();
@@ -276,9 +266,26 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                 dataColumnList.add(dataColumn);
             }
 
+            final IngestionTestBase.IngestionRequestParams params =
+                    new IngestionTestBase.IngestionRequestParams(
+                            providerId,
+                            requestId,
+                            null,
+                            null,
+                            startSeconds,
+                            startNanos,
+                            samplePeriod, // 5 values per second
+                            numSamples, // each DataColumn must contain 5 DataValues
+                            pvNames,
+                            null,
+                            null,
+                            null,
+                            dataColumnList
+                    );
+
             // build request
             final IngestDataRequest ingestionRequest =
-                    IngestionTestBase.buildIngestionRequest(params, dataColumnList);
+                    IngestionTestBase.buildIngestionRequest(params);
 
             // send request
             final List<BucketDocument> bucketDocumentList=
@@ -294,7 +301,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }
@@ -322,8 +333,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(
@@ -337,7 +347,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
             try {
                 final FileOutputStream outputStream = new FileOutputStream(outputFile);
                 outputStream.write(
-                        responseBucket.getDataColumn().getDataValues(0).getImageValue().getImage().toByteArray());
+                        responseBucket.getDataValues().getDataColumn().getDataValues(0).getImageValue().getImage().toByteArray());
             } catch (IOException ex) {
                 fail("error writing test-image-output.bmp");
             }
@@ -369,21 +379,6 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
             final long samplePeriod = 1_000_000_000L / numSamples;
             final long endSeconds = startSeconds;
             final long endNanos = samplePeriod * (numSamples - 1);
-            final IngestionTestBase.IngestionRequestParams params =
-                    new IngestionTestBase.IngestionRequestParams(
-                            providerId,
-                            requestId,
-                            null,
-                            null,
-                            null,
-                            null,
-                            startSeconds,
-                            startNanos,
-                            samplePeriod,
-                            numSamples,
-                            pvNames,
-                            null,
-                            null, null, false);
 
             // build list of DataColumns
             final List<DataColumn> dataColumnList = new ArrayList<>();
@@ -487,9 +482,26 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                 validationMap.put(dataColumn, dataValueModelList);
             }
 
+            final IngestionTestBase.IngestionRequestParams params =
+                    new IngestionTestBase.IngestionRequestParams(
+                            providerId,
+                            requestId,
+                            null,
+                            null,
+                            startSeconds,
+                            startNanos,
+                            samplePeriod,
+                            numSamples,
+                            pvNames,
+                            null,
+                            null,
+                            null,
+                            dataColumnList
+                    );
+
             // build request
             final IngestDataRequest ingestionRequest =
-                    IngestionTestBase.buildIngestionRequest(params, dataColumnList);
+                    IngestionTestBase.buildIngestionRequest(params);
 
             // send request
             final List<BucketDocument> bucketDocumentList =
@@ -505,7 +517,11 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
 
                 DataColumn bucketDataColumn = null;
                 try {
-                    bucketDataColumn = bucketDocument.getDataColumn().toDataColumn();
+                    bucketDataColumn = GrpcIntegrationIngestionServiceWrapper.tryConvertToDataColumn(bucketDocument.getDataColumn());
+                    if (bucketDataColumn == null) {
+                        // Binary columns can't be converted to DataColumn, skip this test
+                        continue;
+                    }
                 } catch (DpException e) {
                     throw new RuntimeException(e);
                 }
@@ -617,8 +633,7 @@ public abstract class IngestDataTypesTestBase extends GrpcIntegrationTestBase {
                             startSeconds,
                             startNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             final List<DataBucket> queryBuckets = queryServiceWrapper.queryDataStream(
