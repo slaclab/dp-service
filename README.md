@@ -382,7 +382,6 @@ Options for configuring Data Platform services are desribed in more detail in [t
 * [handling for bidirectional streaming API methods](./doc/developer-notes.md#handling-for-bidirectional-streaming-api-methods)
 * [MongoDB interface](./doc/developer-notes.md#mongodb-interface)
 * [storing PV time-series data in MongoDB documents](./doc/developer-notes.md#storing-PV-time-series-data-in-MongoDB-documents)
-* [using SerializedDataColumns for improved API performance](./doc/developer-notes.md#using-SerializedDataColumns-for-improved-API-performance)
 * [data subscription framework](./doc/developer-notes.md#data-subscription-framework)
 * [data event monitoring framework](./doc/developer-notes.md#data-event-monitoring-framework)
 * [export framework](./doc/developer-notes.md#exporting-data)
