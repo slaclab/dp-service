@@ -20,6 +20,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This is the abstract intermediate base class for tabular data export formats (e.g., csv and xlsx).  This class
+ * overrides the abstract method exportData_() to export the dataset and calculations specified in the request to the
+ * tabular output driver.  Instead of defining abstract methods for subclasses, the TabularDataExportFileInterface
+ * is used to specify the required interface for the concrete tabular output classes.  Derived classes override
+ * createExportFile_ to initialize the instance implementing TabularDataExportFileInterface.
+ */
 public abstract class ExportDataJobAbstractTabular extends ExportDataJobBase {
 
     // constants
@@ -40,6 +47,25 @@ public abstract class ExportDataJobAbstractTabular extends ExportDataJobBase {
     protected abstract TabularDataExportFileInterface createExportFile_(
             DataSetDocument dataset, String serverFilePath) throws DpException;
 
+    /**
+     * Exports the supplied dataset and calculations documents to the tabular export output file. Calls abstract method
+     * createExportFile_() to create the output file interface.  Executes mongo queries to retrieve the specified
+     * dataset and calculations objects, using frameColumnNamesMap to filter the calculations columns, and creates a
+     * tabular data structure from the result.  It then uses the output file interface object methods to write header rows,
+     * data rows, and close the file.
+     *
+     * NOTE: this pulls all the data into memory at once, instead of handling
+     * the data row by row or whatever. It could definitely be optimized, but it's not obvious how to build and write
+     * a tabular data structure to file in a row-by-row fashion (since the number of rows isn't known until all the
+     * timestamps of all the columns are known, since they are all on different timescales).  We would need to know
+     * the timestamp period at the outset, or something along those lines.
+     *
+     * @param datasetDocument
+     * @param calculationsDocument
+     * @param frameColumnNamesMap
+     * @param serverFilePath
+     * @return
+     */
     @Override
     protected ExportDataStatus exportData_(
             DataSetDocument datasetDocument,
@@ -117,7 +143,7 @@ public abstract class ExportDataJobAbstractTabular extends ExportDataJobBase {
                             endNanos
                     );
                 } catch (DpException e) {
-                    final String errorMsg = "exception deserializing BucketDocument fields: " + e.getMessage();
+                    final String errorMsg = "exception building tabular result: " + e.getMessage();
                     logger.error("id: {}, error: {}", this.handlerRequest.responseObserver.hashCode(), errorMsg);
                     return new ExportDataStatus(true, errorMsg);
                 }

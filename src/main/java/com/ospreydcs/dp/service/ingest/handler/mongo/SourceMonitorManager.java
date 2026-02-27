@@ -1,8 +1,6 @@
 package com.ospreydcs.dp.service.ingest.handler.mongo;
 
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
-import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.service.ingest.model.SourceMonitor;
 import org.apache.logging.log4j.LogManager;
@@ -13,6 +11,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * This class manages subscriptions made via the subscribeData() API. It publishes data received in the data ingestion
+ * stream to subscribers registered by PV name.
+ *
+ * A SourceMonitor object is created for each PV subscription and added to the subscriptionMap.
+ *
+ * Concurrency mechanisms are provided to make this class thread safe.
+ *
+ * Methods are provided for adding, removing and terminating SourceMonitors, and for publishing ingested PV data
+ * to subscribers.
+ */
 public class SourceMonitorManager {
 
     // static variables
@@ -91,11 +100,12 @@ public class SourceMonitorManager {
     }
 
     /**
-     * Send a response to subscribers of PVs contained in this ingestion request.  We use a read lock for thread safety
-     * between calling threads (e.g., workers processing ingestion requests).
+     * Publish columns from ingestion request whose PVs have subscriptions.
+     * We use a read lock for thread safety between calling threads (e.g., workers processing ingestion requests).
+     *
      * @param request
      */
-    public void publishDataSubscriptions(IngestDataRequest request) {
+    public void publishDataSubscriptions(IngestDataRequest request, String providerName) {
 
         if (shutdownRequested.get()) {
             return;
@@ -103,52 +113,340 @@ public class SourceMonitorManager {
 
         final DataTimestamps requestDataTimestamps = request.getIngestionDataFrame().getDataTimestamps();
 
-        // publish regular DataColumns in request that have subscribers
+        // publish DataColumns in request that have subscribers
         for (DataColumn requestDataColumn : request.getIngestionDataFrame().getDataColumnsList()) {
             final String pvName = requestDataColumn.getName();
-
-            // acquire readLock only long enough to read local data structure
-            readLock.lock();
-            List<SourceMonitor> sourceMonitorsCopy;
-            try {
-                final List<SourceMonitor> sourceMonitors = subscriptionMap.get(pvName);
-                sourceMonitorsCopy =
-                        (sourceMonitors == null) ? new ArrayList<>() : new ArrayList<>(sourceMonitors);
-            } finally {
-                readLock.unlock();
-            }
-
-            // publish data via monitors
-            final List<DataColumn> responseDataColumns = List.of(requestDataColumn);
-            for (SourceMonitor monitor : sourceMonitorsCopy) {
-                // publish data to subscriber if response stream is active
-                monitor.publishDataColumns(pvName, requestDataTimestamps, responseDataColumns);
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setDataColumn(requestDataColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
             }
         }
 
         // publish SerializedDataColumns in request that have subscribers
-        for (SerializedDataColumn requestSerializedColumn : request.getIngestionDataFrame().getSerializedDataColumnsList()) {
-
-            final String pvName = requestSerializedColumn.getName();
-
-            // acquire readLock only long enough to read local data structure
-            readLock.lock();
-            List<SourceMonitor> sourceMonitorsCopy;
-            try {
-                final List<SourceMonitor> sourceMonitors = subscriptionMap.get(pvName);
-                sourceMonitorsCopy =
-                        (sourceMonitors == null) ? new ArrayList<>() : new ArrayList<>(sourceMonitors);
-            } finally {
-                readLock.unlock();
-            }
-
-            // publish data via monitors
-            final List<SerializedDataColumn> responseSerializedColumns = List.of(requestSerializedColumn);
-            for (SourceMonitor monitor : sourceMonitorsCopy) {
-                // publish data to subscriber if response stream is active
-                monitor.publishSerializedDataColumns(pvName, requestDataTimestamps, responseSerializedColumns);
+        for (SerializedDataColumn requestColumn : request.getIngestionDataFrame().getSerializedDataColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setSerializedDataColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
             }
         }
+
+        // publish DoubleColumns in request that have subscribers
+        for (DoubleColumn requestColumn : request.getIngestionDataFrame().getDoubleColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setDoubleColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish FloatColumns in request that have subscribers
+        for (FloatColumn requestColumn : request.getIngestionDataFrame().getFloatColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setFloatColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish Int64Columns in request that have subscribers
+        for (Int64Column requestColumn : request.getIngestionDataFrame().getInt64ColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setInt64Column(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish Int32Columns in request that have subscribers
+        for (Int32Column requestColumn : request.getIngestionDataFrame().getInt32ColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setInt32Column(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish BoolColumns in request that have subscribers
+        for (BoolColumn requestColumn : request.getIngestionDataFrame().getBoolColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setBoolColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish StringColumns in request that have subscribers
+        for (StringColumn requestColumn : request.getIngestionDataFrame().getStringColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setStringColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish EnumColumns in request that have subscribers
+        for (EnumColumn requestColumn : request.getIngestionDataFrame().getEnumColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setEnumColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish DoubleArrayColumns in request that have subscribers
+        for (DoubleArrayColumn requestColumn : request.getIngestionDataFrame().getDoubleArrayColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setDoubleArrayColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish FloatArrayColumns in request that have subscribers
+        for (FloatArrayColumn requestColumn : request.getIngestionDataFrame().getFloatArrayColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setFloatArrayColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish Int32ArrayColumns in request that have subscribers
+        for (Int32ArrayColumn requestColumn : request.getIngestionDataFrame().getInt32ArrayColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setInt32ArrayColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish Int64ArrayColumns in request that have subscribers
+        for (Int64ArrayColumn requestColumn : request.getIngestionDataFrame().getInt64ArrayColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setInt64ArrayColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish BoolArrayColumns in request that have subscribers
+        for (BoolArrayColumn requestColumn : request.getIngestionDataFrame().getBoolArrayColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setBoolArrayColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish StructColumns in request that have subscribers
+        for (StructColumn requestColumn : request.getIngestionDataFrame().getStructColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setStructColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+        // publish ImageColumns in request that have subscribers
+        for (ImageColumn requestColumn : request.getIngestionDataFrame().getImageColumnsList()) {
+            final String pvName = requestColumn.getName();
+            final List<SourceMonitor> pvSubscribers = getSubscribersForPv(pvName);
+            if (pvSubscribers.size() > 0) {
+                // create DataBucket for column
+                DataBucket columnBucket = DataBucket.newBuilder()
+                        .setPvName(pvName)
+                        .setDataTimestamps(requestDataTimestamps)
+                        .setDataValues(DataValues.newBuilder().setImageColumn(requestColumn).build())
+                        .setProviderId(request.getProviderId())
+                        .setProviderName(providerName)
+                        .build();
+                // publish DataBucket to each subscriber
+                for (SourceMonitor monitor : pvSubscribers) {
+                    monitor.publishDataBucket(pvName, columnBucket);
+                }
+            }
+        }
+
+    }
+
+    private List<SourceMonitor> getSubscribersForPv(String pvName) {
+        // acquire readLock only long enough to read local data structure
+        readLock.lock();
+        List<SourceMonitor> sourceMonitorsCopy;
+        try {
+            final List<SourceMonitor> sourceMonitors = subscriptionMap.get(pvName);
+            sourceMonitorsCopy =
+                    (sourceMonitors == null) ? new ArrayList<>() : new ArrayList<>(sourceMonitors);
+        } finally {
+            readLock.unlock();
+        }
+        return sourceMonitorsCopy;
     }
 
     /**

@@ -7,6 +7,10 @@ import com.ospreydcs.dp.service.annotation.handler.mongo.export.DataExportHdf5Fi
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.query.handler.mongo.client.MongoQueryClientInterface;
 
+/**
+ * This class services an exportData() request using a bucketed HDF5 output format.  It creates a DataExportHdf5File
+ * object for use by ExportDataJobAbstractBucketed.execute() to write the output file.
+ */
 public class ExportDataJobHdf5 extends ExportDataJobAbstractBucketed {
 
     public ExportDataJobHdf5(

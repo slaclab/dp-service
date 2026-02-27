@@ -2,21 +2,30 @@ package com.ospreydcs.dp.service.annotation.handler.mongo.export;
 
 import ch.systemsx.cisd.hdf5.HDF5Factory;
 import ch.systemsx.cisd.hdf5.IHDF5Writer;
+import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.common.CalculationsSpec;
-import com.ospreydcs.dp.service.common.bson.DataColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
+import org.bson.Document;
 
 import java.io.File;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 
-/*
+/**
+ *
+ * This class is used by the exportData() API handling framework to export data to HDF5 format.  The HDF5 group indexing
+ * structure is created during construction / initialization.  The client uses methods writeDataSet(), writeBucket(),
+ * and writeCalculations() to add data to the file, and calls close() when finished writing data.
+ *
+ * This implementation uses the library ch.systemsx.cisd.hdf5 to create and write to the HDF5 file.
+ *
  * Export file directory structure (using hdf5 groups):
  *
  * /root/dataset : Contains details about the dataset exported to this file, with list of pvs and begin/end times
@@ -57,6 +66,7 @@ public class DataExportHdf5File implements BucketedDataExportFileInterface {
     public final static String DATASET_SAMPLE_COUNT = "sampleCount";
     public final static String DATASET_SAMPLE_PERIOD = "samplePeriod";
     public final static String DATA_COLUMN_BYTES = "dataColumnBytes";
+    public final static String DATA_COLUMN_ENCODING = "dataColumnEncoding";
     public final static String DATA_TIMESTAMPS_BYTES = "dataTimestampsBytes";
     public final static String DATASET_TAGS = "tags";
     public final static String DATASET_ATTRIBUTE_MAP_KEYS = "attributeMapKeys";
@@ -69,9 +79,9 @@ public class DataExportHdf5File implements BucketedDataExportFileInterface {
     public final static String DATASET_PROVIDER_ID = "providerId";
     public final static String GROUP_FRAMES = "frames";
     public final static String GROUP_NAME = "name";
-    public final static String GROUP_DATA_TIMESTAMPS = "dataTimestamps";
     public final static String GROUP_COLUMNS = "columns";
     public final static String PATH_SEPARATOR = "/";
+    public final static String ENCODING_PROTO = "proto";
 
     // instance variables
     private final IHDF5Writer writer;
@@ -187,64 +197,23 @@ public class DataExportHdf5File implements BucketedDataExportFileInterface {
         final String samplePeriodPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_SAMPLE_PERIOD;
         writer.writeLong(samplePeriodPath, bucketDocument.getDataTimestamps().getSamplePeriod());
 
-        // DataColumn serialized bytes
+        // data column content as serialized protobuf
         Objects.requireNonNull(bucketDocument.getDataColumn());
-        final byte[] dataColumnBytes = bucketDocument.getDataColumn().getBytes();
+        final Message protobufColumn = bucketDocument.getDataColumn().toProtobufColumn();
+        final byte[] dataColumnBytes = protobufColumn.toByteArray();
         Objects.requireNonNull(dataColumnBytes);
         final String columnDataPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATA_COLUMN_BYTES;
         writer.writeByteArray(columnDataPath, dataColumnBytes);
+
+        // data column type / encoding information
+        final String encodingPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATA_COLUMN_ENCODING;
+        final String columnEncoding = ENCODING_PROTO + ":" + protobufColumn.getClass().getSimpleName();
+        writer.writeString(encodingPath, columnEncoding);
 
         // dataTimestampsBytes
         Objects.requireNonNull(bucketDocument.getDataTimestamps().getBytes());
         final String dataTimestampsPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATA_TIMESTAMPS_BYTES;
         writer.writeByteArray(dataTimestampsPath, bucketDocument.getDataTimestamps().getBytes());
-
-        // tags
-        if (bucketDocument.getTags() != null) {
-            final String tagsPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_TAGS;
-            writer.writeStringArray(tagsPath, bucketDocument.getTags().toArray(new String[0]));
-        }
-
-        // attributeMap - write keys to one array and values to another
-        if (bucketDocument.getAttributes() != null) {
-            final String attributeMapKeysPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_ATTRIBUTE_MAP_KEYS;
-            writer.writeStringArray(attributeMapKeysPath, bucketDocument.getAttributes().keySet().toArray(new String[0]));
-            final String attributeMapValuesPath = pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_ATTRIBUTE_MAP_VALUES;
-            writer.writeStringArray(attributeMapValuesPath, bucketDocument.getAttributes().values().toArray(new String[0]));
-        }
-
-        // eventMetadata - description, start/stop times
-        if (bucketDocument.getEvent() != null) {
-            final String eventMetadataDescriptionPath =
-                    pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_EVENT_METADATA_DESCRIPTION;
-            writer.writeString(eventMetadataDescriptionPath, bucketDocument.getEvent().getDescription());
-
-            if (bucketDocument.getEvent().getStartTime() != null) {
-                final String eventMetadataStartSecondsPath =
-                        pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_SECONDS;
-                writer.writeLong(
-                        eventMetadataStartSecondsPath,
-                        bucketDocument.getEvent().getStartTime().getSeconds());
-                final String eventMetadataStartNanosPath =
-                        pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_NANOS;
-                writer.writeLong(
-                        eventMetadataStartNanosPath,
-                        bucketDocument.getEvent().getStartTime().getNanos());
-            }
-
-            if (bucketDocument.getEvent().getStopTime() != null) {
-                final String eventMetadataStopSecondsPath =
-                        pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_SECONDS;
-                writer.writeLong(
-                        eventMetadataStopSecondsPath,
-                        bucketDocument.getEvent().getStopTime().getSeconds());
-                final String eventMetadataStopNanosPath =
-                        pvTimesSecondsNanosGroup + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_NANOS;
-                writer.writeLong(
-                        eventMetadataStopNanosPath,
-                        bucketDocument.getEvent().getStopTime().getNanos());
-            }
-        }
 
         // providerId
         Objects.requireNonNull(bucketDocument.getProviderId());
@@ -343,7 +312,7 @@ public class DataExportHdf5File implements BucketedDataExportFileInterface {
                         writer.writeString(columnNamePath, columnName);
 
                         // write serialized dataColumnBytes
-                        final byte[] dataColumnBytes = calculationsDataColumnDocument.getBytes();
+                        final byte[] dataColumnBytes = calculationsDataColumnDocument.toByteArray();
                         Objects.requireNonNull(dataColumnBytes);
                         final String dataColumnBytesPath = dataColumnGroup
                                 + PATH_SEPARATOR

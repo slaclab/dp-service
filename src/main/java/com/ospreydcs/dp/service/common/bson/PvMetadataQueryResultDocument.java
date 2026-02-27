@@ -7,7 +7,6 @@ public class PvMetadataQueryResultDocument {
     // instance variables
     private String pvName;
     private String lastBucketId;
-    private int lastBucketDataTypeCase;
     private String lastBucketDataType;
     private int lastBucketDataTimestampsCase;
     private String lastBucketDataTimestampsType;
@@ -33,14 +32,6 @@ public class PvMetadataQueryResultDocument {
 
     public void setLastBucketId(String lastBucketId) {
         this.lastBucketId = lastBucketId;
-    }
-
-    public int getLastBucketDataTypeCase() {
-        return lastBucketDataTypeCase;
-    }
-
-    public void setLastBucketDataTypeCase(int lastBucketDataTypeCase) {
-        this.lastBucketDataTypeCase = lastBucketDataTypeCase;
     }
 
     public String getLastBucketDataType() {

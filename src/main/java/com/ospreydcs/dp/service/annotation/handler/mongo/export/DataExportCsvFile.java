@@ -14,6 +14,13 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This class provides an interface for writing data to CSV output file.  It is created and managed by
+ * ExportDataJobExcel and ExportDataJobAbstractTabular, respectively.
+ *
+ * It implements the TabularDataExportFileInterface methods, writeHeaderRow(), writeData(), and close(). It uses the
+ * de.siegmar.fastcsv library for creating and writing to the CSV file.
+ */
 public class DataExportCsvFile implements TabularDataExportFileInterface {
 
     // static variables

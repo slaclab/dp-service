@@ -1,18 +1,20 @@
 package com.ospreydcs.dp.service.annotation;
 
 import ch.systemsx.cisd.hdf5.IHDF5Reader;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.ospreydcs.dp.grpc.v1.annotation.*;
 import com.ospreydcs.dp.grpc.v1.common.CalculationsSpec;
+import com.ospreydcs.dp.grpc.v1.common.DataColumn;
+import com.ospreydcs.dp.grpc.v1.common.DoubleColumn;
 import com.ospreydcs.dp.grpc.v1.common.Timestamp;
-import com.ospreydcs.dp.service.common.bson.DataColumnDocument;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
+import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.protobuf.AttributesUtility;
-import com.ospreydcs.dp.service.common.protobuf.EventMetadataUtility;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
@@ -24,6 +26,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.ospreydcs.dp.service.annotation.handler.mongo.export.DataExportHdf5File.*;
 import static org.junit.Assert.*;
 
+/**
+ * Base class for unit and integration tests covering the Annotation Service APIs.  Provides utilities for those tests,
+ * including 1) params objects for creating protobuf API requests, 2) methods for building protobuf API requests from
+ * the params, 3) observers for the API response streams, and 4) utilities for verifying the API results.
+ */
 public class AnnotationTestBase {
 
     public record AnnotationDataBlock(
@@ -260,7 +267,6 @@ public class AnnotationTestBase {
         public final String comment;
         public final List<String> tags;
         public final Map<String, String> attributeMap;
-        public final EventMetadataUtility.EventMetadataParams eventMetadataParams;
         public final Calculations calculations;
 
         public SaveAnnotationRequestParams(String ownerId, String name, List<String> dataSetIds) {
@@ -272,7 +278,6 @@ public class AnnotationTestBase {
             this.comment = null;
             this.tags = null;
             this.attributeMap = null;
-            this.eventMetadataParams = null;
             this.calculations = null;
         }
 
@@ -285,7 +290,6 @@ public class AnnotationTestBase {
                 String comment,
                 List<String> tags,
                 Map<String, String> attributeMap,
-                EventMetadataUtility.EventMetadataParams eventMetadataParams,
                 Calculations calculations
         ) {
             this.id = id;
@@ -296,7 +300,6 @@ public class AnnotationTestBase {
             this.comment = comment;
             this.tags = tags;
             this.attributeMap = attributeMap;
-            this.eventMetadataParams = eventMetadataParams;
             this.calculations = calculations;
         }
     }
@@ -620,8 +623,8 @@ public class AnnotationTestBase {
 
     public static SaveDataSetRequest buildSaveDataSetRequest(SaveDataSetParams params) {
 
-        com.ospreydcs.dp.grpc.v1.annotation.DataSet.Builder dataSetBuilder
-                = com.ospreydcs.dp.grpc.v1.annotation.DataSet.newBuilder();
+        DataSet.Builder dataSetBuilder
+                = DataSet.newBuilder();
 
         for (AnnotationDataBlock block : params.dataSet.dataBlocks) {
 
@@ -633,8 +636,8 @@ public class AnnotationTestBase {
             endTimeBuilder.setEpochSeconds(block.endSeconds);
             endTimeBuilder.setNanoseconds(block.endNanos);
 
-            com.ospreydcs.dp.grpc.v1.annotation.DataBlock.Builder dataBlockBuilder
-                    = com.ospreydcs.dp.grpc.v1.annotation.DataBlock.newBuilder();
+            DataBlock.Builder dataBlockBuilder
+                    = DataBlock.newBuilder();
             dataBlockBuilder.setBeginTime(beginTimeBuilder);
             dataBlockBuilder.setEndTime(endTimeBuilder);
             dataBlockBuilder.addAllPvNames(block.pvNames);
@@ -744,9 +747,6 @@ public class AnnotationTestBase {
         }
         if (params.attributeMap != null) {
             requestBuilder.addAllAttributes(AttributesUtility.attributeListFromMap(params.attributeMap));
-        }
-        if (params.eventMetadataParams != null) {
-            requestBuilder.setEventMetadata(EventMetadataUtility.eventMetadataFromParams(params.eventMetadataParams));
         }
         if (params.calculations != null) {
             requestBuilder.setCalculations(params.calculations);
@@ -997,9 +997,34 @@ public class AnnotationTestBase {
                 bucketDocument.getDataTimestamps().getSamplePeriod(),
                 reader.readLong(samplePeriodPath));
 
-        // dataColumnBytes
+        // data column content as byte array
         final String columnDataPath = pvBucketPath + PATH_SEPARATOR + DATA_COLUMN_BYTES;
-        assertArrayEquals(bucketDocument.getDataColumn().getBytes(), reader.readAsByteArray(columnDataPath));
+        Message documentProtobufColumn = bucketDocument.getDataColumn().toProtobufColumn();
+        final byte[] fileBytes = reader.readAsByteArray(columnDataPath);
+        assertArrayEquals(documentProtobufColumn.toByteArray(), fileBytes);
+
+        // data column encoding
+        final String columnEncodingPath = pvBucketPath + PATH_SEPARATOR + DATA_COLUMN_ENCODING;
+        final String fileEncodingValue = reader.readString(columnEncodingPath);
+        assertEquals(
+                ENCODING_PROTO + ":" + documentProtobufColumn.getClass().getSimpleName(),
+                fileEncodingValue);
+
+        // test deserialization of encoded column
+        try {
+            Message fileProtobufColumn = null;
+            switch (reader.readString(columnEncodingPath)) {
+                case (ENCODING_PROTO + ":" + "DataColumn") -> {
+                    fileProtobufColumn = DataColumn.parseFrom(fileBytes);
+                }
+                case (ENCODING_PROTO + ":" + "DoubleColumn") -> {
+                    fileProtobufColumn = DoubleColumn.parseFrom(fileBytes);
+                }
+            }
+            assertEquals(documentProtobufColumn, fileProtobufColumn);
+        } catch (InvalidProtocolBufferException e) {
+            fail("error parsing protobuf column: " + e.getMessage());
+        }
 
         // dataTimestampsBytes
         final String dataTimestampsPath = pvBucketPath + PATH_SEPARATOR + DATA_TIMESTAMPS_BYTES;
@@ -1031,56 +1056,6 @@ public class AnnotationTestBase {
                     reader.readStringArray(attributeMapValuesPath));
         } else {
             assertFalse(reader.object().exists(attributeMapKeysPath));
-        }
-
-        // eventMetadata - description, start/stop times
-        final String eventMetadataDescriptionPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_DESCRIPTION;
-        final String eventMetadataStartSecondsPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_SECONDS;
-        final String eventMetadataStartNanosPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_START_NANOS;
-        final String eventMetadataStopSecondsPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_SECONDS;
-        final String eventMetadataStopNanosPath =
-                pvBucketPath + PATH_SEPARATOR + DATASET_EVENT_METADATA_STOP_NANOS;
-        if (bucketDocument.getEvent() != null) {
-            final EventMetadataDocument bucketEvent = bucketDocument.getEvent();
-            
-            if (bucketEvent.getDescription() != null) {
-                assertTrue(reader.object().exists(eventMetadataDescriptionPath));
-                assertEquals(
-                        bucketEvent.getDescription(),
-                        reader.readString(eventMetadataDescriptionPath));
-            }
-
-            if (bucketEvent.getStartTime() != null) {
-                assertTrue(reader.object().exists(eventMetadataStartSecondsPath));
-                assertEquals(
-                        bucketEvent.getStartTime().getSeconds(),
-                        reader.readLong(eventMetadataStartSecondsPath));
-                assertTrue(reader.object().exists(eventMetadataStartNanosPath));
-                assertEquals(
-                        bucketEvent.getStartTime().getNanos(),
-                        reader.readLong(eventMetadataStartNanosPath));
-            }
-
-            if (bucketEvent.getStopTime() != null) {
-                assertTrue(reader.object().exists(eventMetadataStopSecondsPath));
-                assertEquals(
-                        bucketEvent.getStopTime().getSeconds(),
-                        reader.readLong(eventMetadataStopSecondsPath));
-                assertTrue(reader.object().exists(eventMetadataStopNanosPath));
-                assertEquals(
-                        bucketEvent.getStopTime().getNanos(),
-                        reader.readLong(eventMetadataStopNanosPath));
-            }
-        } else {
-            assertFalse(reader.object().exists(eventMetadataDescriptionPath));
-            assertFalse(reader.object().exists(eventMetadataStartSecondsPath));
-            assertFalse(reader.object().exists(eventMetadataStartNanosPath));
-            assertFalse(reader.object().exists(eventMetadataStopSecondsPath));
-            assertFalse(reader.object().exists(eventMetadataStopNanosPath));
         }
 
         // providerId
@@ -1154,7 +1129,7 @@ public class AnnotationTestBase {
                 // verify dataColumnBytes
                 final String dataColumnBytesPath = columnIndexGroup + PATH_SEPARATOR + DATA_COLUMN_BYTES;
                 assertArrayEquals(
-                        calculationsDataColumnDocument.getBytes(),
+                        calculationsDataColumnDocument.toByteArray(),
                         reader.readAsByteArray(dataColumnBytesPath));
 
                 columnIndex = columnIndex + 1;

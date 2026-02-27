@@ -3,17 +3,13 @@ package com.ospreydcs.dp.service.common.bson.bucket;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
 import com.ospreydcs.dp.grpc.v1.query.QueryDataRequest;
-import com.ospreydcs.dp.service.common.bson.DataColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.bson.DataTimestampsDocument;
 import com.ospreydcs.dp.service.common.bson.DpBsonDocumentBase;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
-import com.ospreydcs.dp.service.common.protobuf.AttributesUtility;
-import com.ospreydcs.dp.service.ingest.model.DpIngestionException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * This POJO is for writing time series data to mongodb by customizing the code registry.
@@ -25,7 +21,7 @@ public class BucketDocument extends DpBsonDocumentBase {
     // instance variables
     private String id;
     private String pvName;
-    private DataColumnDocument dataColumn;
+    private ColumnDocumentBase dataColumn;
     private DataTimestampsDocument dataTimestamps;
     private String providerId;
     private String providerName;
@@ -47,11 +43,11 @@ public class BucketDocument extends DpBsonDocumentBase {
         this.pvName = pvName;
     }
 
-    public DataColumnDocument getDataColumn() {
+    public ColumnDocumentBase getDataColumn() {
         return dataColumn;
     }
 
-    public void setDataColumn(DataColumnDocument dataColumn) {
+    public void setDataColumn(ColumnDocumentBase dataColumn) {
         this.dataColumn = dataColumn;
     }
 
@@ -90,7 +86,7 @@ public class BucketDocument extends DpBsonDocumentBase {
     private static BucketDocument columnBucketDocument(
             String pvName,
             IngestDataRequest request,
-            DataColumnDocument dataColumnDocument,
+            ColumnDocumentBase dataColumnDocument,
             String providerName
     ) {
         final BucketDocument bucket = new BucketDocument();
@@ -114,48 +110,7 @@ public class BucketDocument extends DpBsonDocumentBase {
         // embed requestDataTimesetampsDocument within each BucketDocument
         bucket.setDataTimestamps(requestDataTimestampsDocument);
 
-        // add tags
-        if ( ! request.getTagsList().isEmpty()) {
-            bucket.setTags(request.getTagsList());
-        }
-
-        // add attributes
-        if ( ! request.getAttributesList().isEmpty()) {
-            final Map<String, String> attributeMap =
-                    AttributesUtility.attributeMapFromList(request.getAttributesList());
-            bucket.setAttributes(attributeMap);
-        }
-
-        // create EventMetadataDocument for request EventMetadata
-        if (request.hasEventMetadata()) {
-            EventMetadataDocument eventMetadataDocument =
-                    EventMetadataDocument.fromEventMetadata(request.getEventMetadata());
-            bucket.setEvent(eventMetadataDocument);
-        }
-
         return bucket;
-    }
-
-    private static BucketDocument dataColumnBucketDocument(
-            IngestDataRequest request,
-            DataColumn column,
-            String providerName
-    ) {
-        // create DataColumnDocument for request DataColumn
-        DataColumnDocument dataColumnDocument = DataColumnDocument.fromDataColumn(column);
-        final String pvName = column.getName();
-        return columnBucketDocument(pvName, request, dataColumnDocument, providerName);
-    }
-
-    private static BucketDocument serializedDataColumnBucketDocument(
-            IngestDataRequest request,
-            SerializedDataColumn column,
-            String providerName
-    ) {
-        // create DataColumnDocument for request DataColumn
-        DataColumnDocument dataColumnDocument = DataColumnDocument.fromSerializedDataColumn(column);
-        final String pvName = column.getName();
-        return columnBucketDocument(pvName, request, dataColumnDocument, providerName);
     }
 
     /**
@@ -169,19 +124,104 @@ public class BucketDocument extends DpBsonDocumentBase {
      * @return
      */
     public static List<BucketDocument> generateBucketsFromRequest(IngestDataRequest request, String providerName)
-            throws DpIngestionException {
+            throws DpException {
 
         final List<BucketDocument> bucketList = new ArrayList<>();
 
         // create BucketDocument for each DataColumn
         for (DataColumn column : request.getIngestionDataFrame().getDataColumnsList()) {
-            bucketList.add(dataColumnBucketDocument(request, column, providerName));
+            ColumnDocumentBase columnDocument = DataColumnDocument.fromDataColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 
         // create BucketDocument for each SerializedDataColumn
-        for (SerializedDataColumn column :
-                request.getIngestionDataFrame().getSerializedDataColumnsList()) {
-            bucketList.add(serializedDataColumnBucketDocument(request, column, providerName));
+        for (SerializedDataColumn column : request.getIngestionDataFrame().getSerializedDataColumnsList()) {
+            ColumnDocumentBase columnDocument = SerializedDataColumnDocument.fromSerializedDataColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each DoubleColumn
+        for (DoubleColumn column : request.getIngestionDataFrame().getDoubleColumnsList()) {
+            ColumnDocumentBase columnDocument = DoubleColumnDocument.fromDoubleColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each FloatColumn
+        for (FloatColumn column : request.getIngestionDataFrame().getFloatColumnsList()) {
+            ColumnDocumentBase columnDocument = FloatColumnDocument.fromFloatColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each Int64Column
+        for (Int64Column column : request.getIngestionDataFrame().getInt64ColumnsList()) {
+            ColumnDocumentBase columnDocument = Int64ColumnDocument.fromInt64Column(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each Int32Column
+        for (Int32Column column : request.getIngestionDataFrame().getInt32ColumnsList()) {
+            ColumnDocumentBase columnDocument = Int32ColumnDocument.fromInt32Column(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each BoolColumn
+        for (BoolColumn column : request.getIngestionDataFrame().getBoolColumnsList()) {
+            ColumnDocumentBase columnDocument = BoolColumnDocument.fromBoolColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each StringColumn
+        for (StringColumn column : request.getIngestionDataFrame().getStringColumnsList()) {
+            ColumnDocumentBase columnDocument = StringColumnDocument.fromStringColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each EnumColumn
+        for (EnumColumn column : request.getIngestionDataFrame().getEnumColumnsList()) {
+            ColumnDocumentBase columnDocument = EnumColumnDocument.fromEnumColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each DoubleArrayColumn
+        for (DoubleArrayColumn column : request.getIngestionDataFrame().getDoubleArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = DoubleArrayColumnDocument.fromDoubleArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each FloatArrayColumn
+        for (FloatArrayColumn column : request.getIngestionDataFrame().getFloatArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = FloatArrayColumnDocument.fromFloatArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each Int32ArrayColumn
+        for (Int32ArrayColumn column : request.getIngestionDataFrame().getInt32ArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = Int32ArrayColumnDocument.fromInt32ArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each Int64ArrayColumn
+        for (Int64ArrayColumn column : request.getIngestionDataFrame().getInt64ArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = Int64ArrayColumnDocument.fromInt64ArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each BoolArrayColumn
+        for (BoolArrayColumn column : request.getIngestionDataFrame().getBoolArrayColumnsList()) {
+            ColumnDocumentBase columnDocument = BoolArrayColumnDocument.fromBoolArrayColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each StructColumn
+        for (StructColumn column : request.getIngestionDataFrame().getStructColumnsList()) {
+            ColumnDocumentBase columnDocument = StructColumnDocument.fromStructColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
+        }
+
+        // create BucketDocument for each ImageColumn
+        for (ImageColumn column : request.getIngestionDataFrame().getImageColumnsList()) {
+            ColumnDocumentBase columnDocument = ImageColumnDocument.fromImageColumn(column);
+            bucketList.add(columnBucketDocument(column.getName(), request, columnDocument, providerName));
         }
 
         return bucketList;
@@ -194,42 +234,15 @@ public class BucketDocument extends DpBsonDocumentBase {
 
         final DataBucket.Builder bucketBuilder = DataBucket.newBuilder();
 
+        // set name
+        bucketBuilder.setPvName(document.getPvName());
+
         // add data timestamps
         DataTimestamps dataTimestamps = document.getDataTimestamps().toDataTimestamps();
         bucketBuilder.setDataTimestamps(dataTimestamps);
 
         // add data values
-        if (querySpec.getUseSerializedDataColumns()) {
-            SerializedDataColumn serializedDataColumn = document.getDataColumn().toSerializedDataColumn();
-            bucketBuilder.setSerializedDataColumn(serializedDataColumn);
-        } else {
-            DataColumn dataColumn = document.getDataColumn().toDataColumn();
-            bucketBuilder.setDataColumn(dataColumn);
-        }
-
-        // add tags
-        if (document.getTags() != null) {
-            bucketBuilder.addAllTags(document.getTags());
-        }
-
-        // add attributes
-        if (document.getAttributes() != null) {
-            for (var documentAttributeMapEntry : document.getAttributes().entrySet()) {
-                final String documentAttributeKey = documentAttributeMapEntry.getKey();
-                final String documentAttributeValue = documentAttributeMapEntry.getValue();
-                final Attribute responseAttribute = Attribute.newBuilder()
-                        .setName(documentAttributeKey)
-                        .setValue(documentAttributeValue)
-                        .build();
-                bucketBuilder.addAttributes(responseAttribute);
-            }
-        }
-
-        // add event metadata
-        if (document.getEvent() != null) {
-            final EventMetadataDocument eventMetadataDocument = document.getEvent();
-            bucketBuilder.setEventMetadata(eventMetadataDocument.toEventMetadata());
-        }
+        document.getDataColumn().addColumnToBucket(bucketBuilder);
 
         // add provider details
         if (document.getProviderId() != null) {

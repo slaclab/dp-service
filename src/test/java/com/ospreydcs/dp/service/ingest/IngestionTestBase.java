@@ -13,7 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.Assert.*;
 
 /**
- * Provides features and utilities for testing of ingestion service by inheritance to derived classes.
+ * Base class for unit and integration tests covering the Ingestion Service APIs.  Provides utilities for those tests,
+ * including 1) params objects for creating protobuf API requests, 2) methods for building protobuf API requests from
+ * the params, 3) observers for the API response streams, and 4) utilities for verifying the API results.
  */
 public class IngestionTestBase {
 
@@ -29,38 +31,59 @@ public class IngestionTestBase {
     }
 
     /**
-     * Encapsulates the parameters for creating an IngestionRequest API object.
+     * Encapsulates the parameters for creating an IngestDataRequest API object.
+     *
+     * The caller should create an instance with the desired fields set, and then call one of the setter methods with
+     * a list of columns of the appropriate type.  The DataColumns handling from the original implementation is preserved
+     * for backward compatibility.
      */
-    public static class IngestionRequestParams {
+    public static final class IngestionRequestParams {
 
-        public String providerId = null;
-        public String requestId = null;
-        public Long snapshotStartTimestampSeconds = null;
-        public Long snapshotStartTimestampNanos = null;
-        public List<Long> timestampsSecondsList = null;
-        public List<Long> timestampNanosList = null;
-        public Long samplingClockStartSeconds = null;
-        public Long samplingClockStartNanos = null;
-        public Long samplingClockPeriodNanos = null;
-        public Integer samplingClockCount = null;
-        public List<String> columnNames = null;
-        public IngestionDataType dataType = null;
-        public List<List<Object>> values = null;
-        public List<List<DataValue.ValueStatus>> valuesStatus = null;
-        public List<String> tags = null;
-        public Map<String, String> attributes = null;
-        public String eventDescription = null;
-        public Long eventStartSeconds = null;
-        public Long eventStartNanos = null;
-        public Long eventStopSeconds = null;
-        public Long eventStopNanos = null;
-        public final boolean useSerializedDataColumns;
+        private final String providerId;
+        private final String requestId;
+
+        // fields for explicit list of timestamps in request DataTimestamps
+        private final List<Long> timestampsSecondsList;
+        private final List<Long> timestampNanosList;
+
+        // fields for Sampling Clock in request DataTimestamps
+        private final Long samplingClockStartSeconds;
+        private final Long samplingClockStartNanos;
+        private final Long samplingClockPeriodNanos;
+        private final Integer samplingClockCount;
+
+        // list of column names
+        private final List<String> columnNames;
+
+        // fields for building request list of DataColumns with DataValue / ValueStatus objects
+        private final IngestionDataType dataType;
+        private final List<List<Object>> values;
+        private final List<List<DataValue.ValueStatus>> valuesStatus;
+
+        // explicit list of prebuilt DataColumns, instead of construcint them from the dataType / values fields
+        private final List<DataColumn> dataColumnList;
+
+        // data column lists corresponding to the protobuf column types for ingestion
+        // TODO: add other new protobuf column types
+        private List<DoubleColumn> doubleColumnList = null;
+        private List<FloatColumn> floatColumnList = null;
+        private List<Int64Column> int64ColumnList = null;
+        private List<Int32Column> int32ColumnList = null;
+        private List<BoolColumn> boolColumnList = null;
+        private List<StringColumn> stringColumnList = null;
+        private List<EnumColumn> enumColumnList = null;
+        private List<DoubleArrayColumn> doubleArrayColumnList = null;
+        private List<FloatArrayColumn> floatArrayColumnList = null;
+        private List<Int32ArrayColumn> int32ArrayColumnList = null;
+        private List<Int64ArrayColumn> int64ArrayColumnList = null;
+        private List<BoolArrayColumn> boolArrayColumnList = null;
+        private List<StructColumn> structColumnList = null;
+        private List<ImageColumn> imageColumnList = null;
+        private List<SerializedDataColumn> serializedDataColumnList = null;
 
         public IngestionRequestParams(
                 String providerId,
                 String requestId,
-                Long snapshotStartTimestampSeconds,
-                Long snapshotStartTimestampNanos,
                 List<Long> timestampsSecondsList,
                 List<Long> timestampNanosList,
                 Long samplingClockStartSeconds,
@@ -71,12 +94,10 @@ public class IngestionTestBase {
                 IngestionDataType dataType,
                 List<List<Object>> values,
                 List<List<DataValue.ValueStatus>> valuesStatus,
-                boolean useSerializedDataColumns
+                List<DataColumn> dataColumnList
         ) {
             this.providerId = providerId;
             this.requestId = requestId;
-            this.snapshotStartTimestampSeconds = snapshotStartTimestampSeconds;
-            this.snapshotStartTimestampNanos = snapshotStartTimestampNanos;
             this.timestampsSecondsList = timestampsSecondsList;
             this.timestampNanosList = timestampNanosList;
             this.samplingClockStartSeconds = samplingClockStartSeconds;
@@ -87,38 +108,208 @@ public class IngestionTestBase {
             this.dataType = dataType;
             this.values = values;
             this.valuesStatus = valuesStatus;
-            this.useSerializedDataColumns = useSerializedDataColumns;
+            this.dataColumnList = dataColumnList;
         }
 
-        public IngestionRequestParams(
-                String providerId,
-                String requestId,
-                Long snapshotStartTimestampSeconds,
-                Long snapshotStartTimestampNanos,
-                List<Long> timestampsSecondsList,
-                List<Long> timestampNanosList,
-                Long samplingClockStartSeconds,
-                Long samplingClockStartNanos,
-                Long samplingClockPeriodNanos,
-                Integer samplingClockCount,
-                List<String> columnNames,
-                IngestionDataType dataType,
-                List<List<Object>> values,
-                List<String> tags,
-                Map<String, String> attributes,
-                String eventDescription,
-                Long eventStartSeconds,
-                Long eventStartNanos,
-                Long eventStopSeconds,
-                Long eventStopNanos,
-                boolean useSerializedDataColumns
-        ) {
+        public String providerId() {
+            return providerId;
+        }
 
-            this(
+        public String requestId() {
+            return requestId;
+        }
+
+        public List<Long> timestampsSecondsList() {
+            return timestampsSecondsList;
+        }
+
+        public List<Long> timestampNanosList() {
+            return timestampNanosList;
+        }
+
+        public Long samplingClockStartSeconds() {
+            return samplingClockStartSeconds;
+        }
+
+        public Long samplingClockStartNanos() {
+            return samplingClockStartNanos;
+        }
+
+        public Long samplingClockPeriodNanos() {
+            return samplingClockPeriodNanos;
+        }
+
+        public Integer samplingClockCount() {
+            return samplingClockCount;
+        }
+
+        public List<String> columnNames() {
+            return columnNames;
+        }
+
+        public IngestionDataType dataType() {
+            return dataType;
+        }
+
+        public List<List<Object>> values() {
+            return values;
+        }
+
+        public List<List<DataValue.ValueStatus>> valuesStatus() {
+            return valuesStatus;
+        }
+
+        public List<DataColumn> dataColumnList() {
+            return dataColumnList;
+        }
+
+        public void setDoubleColumnList(List<DoubleColumn> doubleColumnList) {
+            this.doubleColumnList = doubleColumnList;
+        }
+
+        public List<DoubleColumn> doubleColumnList() {
+            return doubleColumnList;
+        }
+
+        public void setFloatColumnList(List<FloatColumn> floatColumnList) {
+            this.floatColumnList = floatColumnList;
+        }
+
+        public List<Int64Column> int64ColumnList() {
+            return int64ColumnList;
+        }
+
+        public void setInt64ColumnList(List<Int64Column> int64ColumnList) {
+            this.int64ColumnList = int64ColumnList;
+        }
+
+        public List<Int32Column> int32ColumnList() {
+            return int32ColumnList;
+        }
+
+        public void setInt32ColumnList(List<Int32Column> int32ColumnList) {
+            this.int32ColumnList = int32ColumnList;
+        }
+
+        public List<BoolColumn> boolColumnList() {
+            return boolColumnList;
+        }
+
+        public void setBoolColumnList(List<BoolColumn> boolColumnList) {
+            this.boolColumnList = boolColumnList;
+        }
+
+        public List<StringColumn> stringColumnList() {
+            return stringColumnList;
+        }
+
+        public void setStringColumnList(List<StringColumn> stringColumnList) {
+            this.stringColumnList = stringColumnList;
+        }
+
+        public List<EnumColumn> enumColumnList() {
+            return enumColumnList;
+        }
+
+        public void setEnumColumnList(List<EnumColumn> enumColumnList) {
+            this.enumColumnList = enumColumnList;
+        }
+
+        public List<DoubleArrayColumn> doubleArrayColumnList() {
+            return doubleArrayColumnList;
+        }
+
+        public void setDoubleArrayColumnList(List<DoubleArrayColumn> doubleArrayColumnList) {
+            this.doubleArrayColumnList = doubleArrayColumnList;
+        }
+
+        public List<FloatArrayColumn> floatArrayColumnList() {
+            return floatArrayColumnList;
+        }
+
+        public void setFloatArrayColumnList(List<FloatArrayColumn> floatArrayColumnList) {
+            this.floatArrayColumnList = floatArrayColumnList;
+        }
+
+        public List<Int32ArrayColumn> int32ArrayColumnList() {
+            return int32ArrayColumnList;
+        }
+
+        public void setInt32ArrayColumnList(List<Int32ArrayColumn> int32ArrayColumnList) {
+            this.int32ArrayColumnList = int32ArrayColumnList;
+        }
+
+        public List<Int64ArrayColumn> int64ArrayColumnList() {
+            return int64ArrayColumnList;
+        }
+
+        public void setInt64ArrayColumnList(List<Int64ArrayColumn> int64ArrayColumnList) {
+            this.int64ArrayColumnList = int64ArrayColumnList;
+        }
+
+        public List<BoolArrayColumn> boolArrayColumnList() {
+            return boolArrayColumnList;
+        }
+
+        public void setBoolArrayColumnList(List<BoolArrayColumn> boolArrayColumnList) {
+            this.boolArrayColumnList = boolArrayColumnList;
+        }
+
+        public List<StructColumn> structColumnList() {
+            return structColumnList;
+        }
+
+        public void setStructColumnList(List<StructColumn> structColumnList) {
+            this.structColumnList = structColumnList;
+        }
+
+        public List<ImageColumn> imageColumnList() {
+            return imageColumnList;
+        }
+
+        public void setImageColumnList(List<ImageColumn> imageColumnList) {
+            this.imageColumnList = imageColumnList;
+        }
+
+        public void setSerializedDataColumnList(List<SerializedDataColumn> serializedDataColumnList) {
+            this.serializedDataColumnList = serializedDataColumnList;
+        }
+
+        public List<SerializedDataColumn> serializedDataColumnList() {
+            return serializedDataColumnList;
+        }
+
+        public List<FloatColumn> floatColumnList() {
+            return floatColumnList;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) return true;
+            if (obj == null || obj.getClass() != this.getClass()) return false;
+            var that = (IngestionRequestParams) obj;
+            return Objects.equals(this.providerId, that.providerId) &&
+                    Objects.equals(this.requestId, that.requestId) &&
+                    Objects.equals(this.timestampsSecondsList, that.timestampsSecondsList) &&
+                    Objects.equals(this.timestampNanosList, that.timestampNanosList) &&
+                    Objects.equals(this.samplingClockStartSeconds, that.samplingClockStartSeconds) &&
+                    Objects.equals(this.samplingClockStartNanos, that.samplingClockStartNanos) &&
+                    Objects.equals(this.samplingClockPeriodNanos, that.samplingClockPeriodNanos) &&
+                    Objects.equals(this.samplingClockCount, that.samplingClockCount) &&
+                    Objects.equals(this.columnNames, that.columnNames) &&
+                    Objects.equals(this.dataType, that.dataType) &&
+                    Objects.equals(this.values, that.values) &&
+                    Objects.equals(this.valuesStatus, that.valuesStatus) &&
+                    Objects.equals(this.dataColumnList, that.dataColumnList) &&
+                    Objects.equals(this.doubleColumnList, that.doubleColumnList) &&
+                    Objects.equals(this.floatColumnList, that.floatColumnList);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(
                     providerId,
                     requestId,
-                    snapshotStartTimestampSeconds,
-                    snapshotStartTimestampNanos,
                     timestampsSecondsList,
                     timestampNanosList,
                     samplingClockStartSeconds,
@@ -128,34 +319,47 @@ public class IngestionTestBase {
                     columnNames,
                     dataType,
                     values,
-                    null,
-                    useSerializedDataColumns);
-
-            this.tags = tags;
-            this.attributes = attributes;
-            this.eventDescription = eventDescription;
-            this.eventStartSeconds = eventStartSeconds;
-            this.eventStartNanos = eventStartNanos;
-            this.eventStopSeconds = eventStopSeconds;
-            this.eventStopNanos = eventStopNanos;
+                    valuesStatus,
+                    dataColumnList,
+                    doubleColumnList,
+                    floatColumnList);
         }
-    }
 
-    public static IngestDataRequest buildIngestionRequest(IngestionRequestParams params) {
-        return buildIngestionRequest(params, null);
-    }
+        @Override
+        public String toString() {
+            return "IngestionRequestParams[" +
+                    "providerId=" + providerId + ", " +
+                    "requestId=" + requestId + ", " +
+                    "timestampsSecondsList=" + timestampsSecondsList + ", " +
+                    "timestampNanosList=" + timestampNanosList + ", " +
+                    "samplingClockStartSeconds=" + samplingClockStartSeconds + ", " +
+                    "samplingClockStartNanos=" + samplingClockStartNanos + ", " +
+                    "samplingClockPeriodNanos=" + samplingClockPeriodNanos + ", " +
+                    "samplingClockCount=" + samplingClockCount + ", " +
+                    "columnNames=" + columnNames + ", " +
+                    "dataType=" + dataType + ", " +
+                    "values=" + values + ", " +
+                    "valuesStatus=" + valuesStatus + ", " +
+                    "dataColumnList=" + dataColumnList + ", " +
+                    "doubleColumnList=" + doubleColumnList + ", " +
+                    "floatColumnList=" + floatColumnList + ']';
+        }
+
+        }
 
     /**
-     * Builds an IngestionRequest gRPC API object from an IngestionRequestParams object.
+     * Builds an IngestDataRequest API object from an IngestionRequestParams object.
      * This utility avoids having code to build API requests scattered around the test methods.
+     * If params object contains a list of column names and column data values, there is special handling
+     * to create DataColumns containing the appropriate DataValues (depending on the type of Objects supplied in the
+     * params).  Otherwise, the caller supplies a prebuilt list of protobuf columns of one of the supported types
+     * and those columns are simply passed through to the resulting request object.
      *
      * @param params
      * @return
      */
-    public static IngestDataRequest buildIngestionRequest(
-            IngestionRequestParams params,
-            List<DataColumn> dataColumnList
-    ) {
+    public static IngestDataRequest buildIngestionRequest(IngestionRequestParams params) {
+
         IngestDataRequest.Builder requestBuilder = IngestDataRequest.newBuilder();
 
         if (params.providerId != null) {
@@ -165,8 +369,7 @@ public class IngestionTestBase {
             requestBuilder.setClientRequestId(params.requestId);
         }
 
-        IngestDataRequest.IngestionDataFrame.Builder dataFrameBuilder
-                = IngestDataRequest.IngestionDataFrame.newBuilder();
+        DataFrame.Builder dataFrameBuilder = DataFrame.newBuilder();
         DataTimestamps.Builder dataTimestampsBuilder = DataTimestamps.newBuilder();
 
         // set DataTimestamps for request
@@ -213,12 +416,14 @@ public class IngestionTestBase {
         // create list of columns
         final List<DataColumn> frameColumns = new ArrayList<>();
 
-        if (dataColumnList != null) {
-            // use list of columns if provided by caller
-            frameColumns.addAll(dataColumnList);
+        // DataColumn handling: use explicit list if provided, otherwise build list of DataColumns if appropriate
+        // params are specified.
+        if (params.dataColumnList() != null) {
+            // use explicit list of DataColumns provided by caller
+            frameColumns.addAll(params.dataColumnList());
 
-        } else if (params.columnNames != null) {
-            // otherwise create columns from params
+        } else if (params.columnNames != null && params.values != null) {
+            // otherwise create DataColumns from column names and values from params
 
             assertTrue(params.values != null);
             assertEquals(params.columnNames.size(), params.values.size());
@@ -287,80 +492,88 @@ public class IngestionTestBase {
                 frameColumns.add(dataColumnBuilder.build());
             }
         }
+        // add regular DataColumns
+        dataFrameBuilder.addAllDataColumns(frameColumns);
 
-        // add DataColumns or SerializedDataColumns
-        if (params.useSerializedDataColumns) {
-            // add SerializedDataColumns as specified in params
-            for (DataColumn dataColumn : frameColumns) {
-                final SerializedDataColumn serializedDataColumn =
-                        SerializedDataColumn.newBuilder()
-                                .setName(dataColumn.getName())
-                                .setDataColumnBytes(dataColumn.toByteString())
-                                .build();
-                dataFrameBuilder.addSerializedDataColumns(serializedDataColumn);
-            }
+        // pass through lists of data columns for various supported protobuf column types to request
 
-        } else {
-            // add regular DataColumns
-            dataFrameBuilder.addAllDataColumns(frameColumns);
+        if (params.doubleColumnList() != null) {
+            // use list of DoubleColumns provided by caller
+            dataFrameBuilder.addAllDoubleColumns(params.doubleColumnList());
         }
 
-        // add tags if specified
-        if (params.tags != null) {
-            requestBuilder.addAllTags(params.tags);
+        if (params.floatColumnList() != null) {
+            // use list of FloatColumns provided by caller
+            dataFrameBuilder.addAllFloatColumns(params.floatColumnList());
         }
 
-        // add attributes if specified
-        if (params.attributes != null) {
-            for (var attributeEntry : params.attributes.entrySet()) {
-                String attributeKey = attributeEntry.getKey();
-                String attributeValue = attributeEntry.getValue();
-                final Attribute.Builder attributeBuilder = Attribute.newBuilder();
-                attributeBuilder.setName(attributeKey);
-                attributeBuilder.setValue(attributeValue);
-                attributeBuilder.build();
-                requestBuilder.addAttributes(attributeBuilder);
-            }
+        if (params.int64ColumnList() != null) {
+            // use list of Int64Columns provided by caller
+            dataFrameBuilder.addAllInt64Columns(params.int64ColumnList());
         }
 
-        // set event metadata if specified
-        if (params.eventDescription != null ||  params.eventStartSeconds != null || params.eventStartNanos != null) {
+        if (params.int32ColumnList() != null) {
+            // use list of Int32Columns provided by caller
+            dataFrameBuilder.addAllInt32Columns(params.int32ColumnList());
+        }
 
-            EventMetadata.Builder eventMetadataBuilder = EventMetadata.newBuilder();
+        if (params.boolColumnList() != null) {
+            // use list of BoolColumns provided by caller
+            dataFrameBuilder.addAllBoolColumns(params.boolColumnList());
+        }
 
-            if (params.eventDescription != null) {
-                eventMetadataBuilder.setDescription(params.eventDescription);
-            }
+        if (params.stringColumnList() != null) {
+            // use list of StringColumns provided by caller
+            dataFrameBuilder.addAllStringColumns(params.stringColumnList());
+        }
 
-            if (params.eventStartSeconds != null || params.eventStartNanos != null) {
-                Timestamp.Builder eventStartTimeBuilder = Timestamp.newBuilder();
-                if (params.eventStartSeconds != null) {
-                    eventStartTimeBuilder.setEpochSeconds(params.eventStartSeconds);
-                }
-                if (params.eventStartNanos != null) {
-                    eventStartTimeBuilder.setNanoseconds(params.eventStartNanos);
-                }
-                eventStartTimeBuilder.build();
-                eventMetadataBuilder.setStartTimestamp(eventStartTimeBuilder);
-            }
+        if (params.enumColumnList() != null) {
+            // use list of EnumColumns provided by caller
+            dataFrameBuilder.addAllEnumColumns(params.enumColumnList());
+        }
 
-            if (params.eventStopSeconds != null || params.eventStopNanos != null) {
-                Timestamp.Builder eventStopTimeBuilder = Timestamp.newBuilder();
-                if (params.eventStopSeconds != null) {
-                    eventStopTimeBuilder.setEpochSeconds(params.eventStopSeconds);
-                }
-                if (params.eventStopNanos != null) {
-                    eventStopTimeBuilder.setNanoseconds(params.eventStopNanos);
-                }
-                eventStopTimeBuilder.build();
-                eventMetadataBuilder.setStopTimestamp(eventStopTimeBuilder);
-            }
+        if (params.doubleArrayColumnList() != null) {
+            // use list of DoubleArrayColumns provided by caller
+            dataFrameBuilder.addAllDoubleArrayColumns(params.doubleArrayColumnList());
+        }
 
-            eventMetadataBuilder.build();
-            requestBuilder.setEventMetadata(eventMetadataBuilder);
+        if (params.floatArrayColumnList() != null) {
+            // use list of FloatArrayColumns provided by caller
+            dataFrameBuilder.addAllFloatArrayColumns(params.floatArrayColumnList());
+        }
+
+        if (params.int32ArrayColumnList() != null) {
+            // use list of Int32ArrayColumns provided by caller
+            dataFrameBuilder.addAllInt32ArrayColumns(params.int32ArrayColumnList());
+        }
+
+        if (params.int64ArrayColumnList() != null) {
+            // use list of Int64ArrayColumns provided by caller
+            dataFrameBuilder.addAllInt64ArrayColumns(params.int64ArrayColumnList());
+        }
+
+        if (params.boolArrayColumnList() != null) {
+            // use list of BoolArrayColumns provided by caller
+            dataFrameBuilder.addAllBoolArrayColumns(params.boolArrayColumnList());
+        }
+
+        if (params.structColumnList() != null) {
+            // use list of StructColumns provided by caller
+            dataFrameBuilder.addAllStructColumns(params.structColumnList());
+        }
+
+        if (params.imageColumnList() != null) {
+            // use list of ImageColumns provided by caller
+            dataFrameBuilder.addAllImageColumns(params.imageColumnList());
+        }
+
+        if (params.serializedDataColumnList() != null) {
+            // use list of SerializedDataColumns provided by caller
+            dataFrameBuilder.addAllSerializedDataColumns(params.serializedDataColumnList());
         }
 
         dataFrameBuilder.build();
+
         requestBuilder.setIngestionDataFrame(dataFrameBuilder);
         return requestBuilder.build();
     }

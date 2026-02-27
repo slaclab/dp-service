@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 This is a Data Platform service implementation with three main services:
-- **Ingestion Service**: Handles data ingestion with high-performance streaming APIs
+- **Ingestion Service**: Handles data ingestion with high-performance streaming APIs and comprehensive validation
 - **Query Service**: Provides time-series data retrieval and metadata queries 
 - **Annotation Service**: Manages data annotations, datasets, and data exports
 
@@ -42,7 +42,8 @@ When modifying gRPC APIs:
 1. Update protobuf files in `dp-grpc/src/main/proto/`
 2. Regenerate Java classes: `mvn clean compile` in dp-grpc
 3. Update service implementations in dp-service to match new protobuf signatures
-4. Follow systematic renaming pattern: Service → Handler → Jobs → Dispatchers → Tests
+4. Update validation logic in `IngestionValidationUtility` for new column types
+5. Follow systematic renaming pattern: Service → Handler → Jobs → Dispatchers → Tests
 
 ## MongoDB Collections
 - **buckets**: Time-series data storage (main data collection with embedded protobuf serialization)
@@ -59,13 +60,301 @@ MongoDB documents use embedded protobuf serialization:
 - `DataSetDocument` contains embedded `DataBlockDocument` list
 - Protobuf objects serialized to `bytes` field, with convenience fields for queries
 
+### Column Document Class Hierarchy
+The ingestion service uses a sophisticated class hierarchy for MongoDB column document storage:
+
+**Base Classes:**
+- **`ColumnDocumentBase`**: Abstract base with `name` field and methods for protobuf/MongoDB conversion
+- **`ScalarColumnDocumentBase<T>`**: Generic intermediate class for scalar column types
+
+**Scalar Column Implementation Pattern:**
+```java
+@BsonDiscriminator(key = "_t", value = "columnType")
+public class TypeColumnDocument extends ScalarColumnDocumentBase<JavaType> {
+    
+    // Static factory method
+    public static TypeColumnDocument fromTypeColumn(TypeColumn requestColumn) {
+        TypeColumnDocument document = new TypeColumnDocument();
+        document.setName(requestColumn.getName());
+        document.setValues(requestColumn.getValuesList());
+        return document;
+    }
+    
+    // Protobuf builder creation
+    @Override
+    protected Message.Builder createColumnBuilder() {
+        return TypeColumn.newBuilder();
+    }
+    
+    // Add values to protobuf builder
+    @Override
+    protected void addAllValuesToBuilder(Message.Builder builder, List<JavaType> values) {
+        ((TypeColumn.Builder) builder).addAllValues(values);
+    }
+    
+    // Convert scalar to DataValue for legacy compatibility
+    @Override
+    protected DataValue createDataValueFromScalar(JavaType value) {
+        return DataValue.newBuilder().setTypeValue(value).build();
+    }
+    
+    // Add column to DataBucket for ingestion response
+    @Override
+    public void addColumnToBucket(DataBucket.Builder bucketBuilder) throws DpException {
+        TypeColumn column = (TypeColumn) toProtobufColumn();
+        bucketBuilder.setTypeColumn(column);
+    }
+}
+```
+
+**Column Type Implementation Status:**
+
+**Scalar Columns:**
+| Proto Message | Java Generic Type | Document Class | BSON Discriminator | Status |
+|--------------|------------------|----------------|-------------------|--------|
+| DoubleColumn | `ScalarColumnDocumentBase<Double>` | DoubleColumnDocument | "doubleColumn" | ✅ |
+| FloatColumn | `ScalarColumnDocumentBase<Float>` | FloatColumnDocument | "floatColumn" | ✅ |
+| Int64Column | `ScalarColumnDocumentBase<Long>` | Int64ColumnDocument | "int64Column" | ✅ |
+| Int32Column | `ScalarColumnDocumentBase<Integer>` | Int32ColumnDocument | "int32Column" | ✅ |
+| BoolColumn | `ScalarColumnDocumentBase<Boolean>` | BoolColumnDocument | "boolColumn" | ✅ |
+| StringColumn | `ScalarColumnDocumentBase<String>` | StringColumnDocument | "stringColumn" | ✅ |
+| EnumColumn | `ScalarColumnDocumentBase<Integer>` + `enumId` | EnumColumnDocument | "enumColumn" | ✅ |
+
+**Array Columns:**
+| Proto Message | Base Class | Document Class | BSON Discriminator | Status |
+|--------------|-------------|----------------|-------------------|--------|
+| DoubleArrayColumn | `ArrayColumnDocumentBase` | DoubleArrayColumnDocument | "doubleArrayColumn" | ✅ |
+| FloatArrayColumn | `ArrayColumnDocumentBase` | FloatArrayColumnDocument | "floatArrayColumn" | ✅ |
+| Int32ArrayColumn | `ArrayColumnDocumentBase` | Int32ArrayColumnDocument | "int32ArrayColumn" | ✅ |
+| Int64ArrayColumn | `ArrayColumnDocumentBase` | Int64ArrayColumnDocument | "int64ArrayColumn" | ✅ |
+| BoolArrayColumn | `ArrayColumnDocumentBase` | BoolArrayColumnDocument | "boolArrayColumn" | ✅ |
+
+**Binary Columns:**
+| Proto Message | Base Class | Document Class | BSON Discriminator | Special Features | Status |
+|--------------|-------------|----------------|-------------------|------------------|--------|
+| StructColumn | `BinaryColumnDocumentBase` | StructColumnDocument | "structColumn" | schemaId field | ✅ |
+| ImageColumn | `BinaryColumnDocumentBase` | ImageColumnDocument | "imageColumn" | ImageDescriptor helper | ✅ |
+| SerializedDataColumn | `BinaryColumnDocumentBase` | SerializedDataColumnDocument | "serializedDataColumn" | encoding field | ✅ |
+
+**Legacy Columns:**
+| Proto Message | Current Implementation | Migration Status | Status |
+|--------------|----------------------|------------------|--------|
+| DataColumn | Legacy pattern | Maintain for backward compatibility | ✅ Legacy |
+
+### SerializedDataColumn Migration (Completed)
+
+**SerializedDataColumn** has been successfully migrated from the legacy storage pattern to the modern BinaryColumnDocumentBase hierarchy for architectural consistency with other binary column types.
+
+**Migration Details:**
+- **From**: Legacy `DataColumnDocument.fromSerializedDataColumn()` approach
+- **To**: Modern `SerializedDataColumnDocument extends BinaryColumnDocumentBase`
+- **Benefits**: Consistent binary storage, GridFS readiness, eliminates architectural inconsistency
+- **Backward Compatibility**: Existing legacy tests removed; new integration test `SerializedDataColumnIT` follows StructColumn pattern
+- **Integration Test**: Full API coverage (ingestion, query, data subscription, data event subscription)
+
+**EnumColumn Hybrid Design:**
+EnumColumn uses a hybrid approach that extends the scalar pattern with additional semantic metadata:
+- **Base Pattern**: Extends `ScalarColumnDocumentBase<Integer>` for `List<Integer> values` handling
+- **Additional Field**: Adds `String enumId` field for enum semantic context (e.g., "epics:alarm_status:v1")
+- **Custom Conversion**: Overrides `toProtobufColumn()` to include `enumId` field in protobuf output
+- **Integer Triggers**: Uses integer comparison for data event triggers since Integer implements Comparable
+- **Semantic Preservation**: Maintains enum meaning while leveraging scalar column efficiency
+
+**Benefits of Generic Base Class:**
+- **Code Reuse**: `List<T> values` field and common methods inherited from base
+- **Type Safety**: Compile-time type checking with generic parameter `<T>`
+- **Consistent API**: All scalar columns follow same conversion patterns
+- **Memory Efficiency**: Maintains column-oriented storage for high-frequency ingestion
+- **Legacy Compatibility**: Generic `toDataColumn()` converts to sample-oriented DataColumn
+
+**Inherited Methods from ScalarColumnDocumentBase:**
+- `getValues()` / `setValues()` - Generic value list accessors
+- `toDataColumn()` - Converts to legacy DataColumn with DataValue objects
+- `getBytes()` - Serializes protobuf column to byte array
+- `toProtobufColumn()` - Template method for creating typed protobuf column
+- `addColumnToBucket()` - Abstract method implementation for query result API integration
+
+## Systematic Process for Adding New Protobuf Column Types
+
+The ingestion service uses a proven **7-step systematic process** for adding complete support for new protobuf column types. This process has been successfully applied to scalar columns (DoubleColumn, FloatColumn, etc.), array columns (DoubleArrayColumn, FloatArrayColumn, etc.), and binary columns (StructColumn, ImageColumn).
+
+### Column Type Categories and Base Classes
+
+**Scalar Columns**: Simple value types that extend `ScalarColumnDocumentBase<T>`
+- DoubleColumn → DoubleColumnDocument extends `ScalarColumnDocumentBase<Double>`
+- FloatColumn → FloatColumnDocument extends `ScalarColumnDocumentBase<Float>`
+- Int64Column → Int64ColumnDocument extends `ScalarColumnDocumentBase<Long>`
+- Int32Column → Int32ColumnDocument extends `ScalarColumnDocumentBase<Integer>`
+- BoolColumn → BoolColumnDocument extends `ScalarColumnDocumentBase<Boolean>`
+- StringColumn → StringColumnDocument extends `ScalarColumnDocumentBase<String>`
+- EnumColumn → EnumColumnDocument extends `ScalarColumnDocumentBase<Integer>`
+
+**Array Columns**: Multi-dimensional arrays that extend `ArrayColumnDocumentBase`
+- DoubleArrayColumn → DoubleArrayColumnDocument extends `ArrayColumnDocumentBase`
+- FloatArrayColumn → FloatArrayColumnDocument extends `ArrayColumnDocumentBase`
+- Int32ArrayColumn → Int32ArrayColumnDocument extends `ArrayColumnDocumentBase`
+- Int64ArrayColumn → Int64ArrayColumnDocument extends `ArrayColumnDocumentBase`
+- BoolArrayColumn → BoolArrayColumnDocument extends `ArrayColumnDocumentBase`
+
+**Binary Columns**: Variable-length binary data that extend `BinaryColumnDocumentBase`
+- StructColumn → StructColumnDocument extends `BinaryColumnDocumentBase` (with schemaId)
+- ImageColumn → ImageColumnDocument extends `BinaryColumnDocumentBase` (with ImageDescriptor)
+
+### 7-Step Implementation Process
+
+**Step 1: Create Document Class**
+- Choose appropriate base class (Scalar/Array/BinaryColumnDocumentBase)
+- Add `@BsonDiscriminator(key = "_t", value = "columnType")` annotation
+- Implement required abstract methods from base class
+- Add static factory method `fromProtobufColumn(ProtobufColumn column)`
+- For binary columns: implement `toProtobufColumn()` and `deserializeToProtobufColumn()`
+
+**Step 2: Update BucketDocument Generation**
+- Add new column type handling in `BucketDocument.generateBucketsFromRequest()`
+- Follow pattern: `for (NewColumn column : request.getNewColumnsList()) { ... }`
+- Create document using factory method: `ColumnDocumentBase columnDocument = NewColumnDocument.fromNewColumn(column)`
+
+**Step 3: Register POJO Class in MongoDB Codec**
+- Add document class to `MongoClientBase.getPojoCodecRegistry()`
+- For embedded helper classes (e.g., ImageDescriptorDocument), register separately
+- Ensures proper MongoDB serialization/deserialization
+
+**Step 4: Add Data Subscription Support**
+- Update `SourceMonitorManager.publishDataSubscriptions()`
+- Add new column type case in switch statement for DataBucket creation
+- Pattern: `case NEWCOLUMN -> bucketBuilder.setNewColumn((NewColumn) columnDocument.toProtobufColumn())`
+
+**Step 5: Add Event Subscription Framework Support**
+- Update `ColumnTriggerUtility` for trigger support (scalar columns only)
+- Update `DataBuffer` for size estimation and storage
+- Binary and array columns serve as targets only, not triggers
+
+**Step 6: Update Test Framework Support**
+- Add `List<NewColumn> newColumnList` field to `IngestionTestBase.IngestionRequestParams`
+- Add getter/setter methods: `newColumnList()` and `setNewColumnList()`
+- Update `buildIngestionRequest()` to include new column data: `dataFrameBuilder.addAllNewColumns(params.newColumnList())`
+- Add verification logic to `GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`
+
+**Step 7: Create Integration Test Coverage**
+- Create `NewColumnIT` class extending `GrpcIntegrationTestBase`
+- **Scalar Columns**: Follow `DoubleColumnIT` pattern with single PV approach
+- **Array/Binary Columns**: Follow dual PV approach (scalar trigger + array/binary target)
+- Test coverage: ingestion → query → data subscription → event subscription
+- Verify round-trip data integrity using `assertEquals(originalColumn, retrievedColumn)`
+
+### Class Hierarchy Design Issues
+
+**Known Technical Debt**: The methods `createColumnBuilder()` and `addAllValuesToBuilder()` are defined at `ColumnDocumentBase` level but only apply to scalar columns. Array and binary columns must implement these with `UnsupportedOperationException`. Future refactoring should move these methods to `ScalarColumnDocumentBase`.
+
+### Integration Test Patterns
+
+**Single PV Approach (Scalar Columns)**:
+- Use the column type directly as both ingestion data and trigger/target
+- Simpler test structure with direct column verification
+
+**Dual PV Approach (Array/Binary Columns)**:
+- Scalar PV serves as trigger for event subscriptions
+- Array/binary PV serves as target for event subscriptions
+- Required because array/binary columns cannot function as trigger PVs
+- Both PVs included in initial ingestion for proper validation
+
+**Test Verification Pattern**:
+```java
+// Standard verification for all column types
+DataColumnDocument dataColumnDocument = bucketDocument.getDataColumnDocument();
+NewColumn storedColumn = (NewColumn) dataColumnDocument.toProtobufColumn();
+assertTrue(request.getIngestionDataFrame().getNewColumnsList().contains(storedColumn));
+assertEquals(originalColumn, retrievedColumn); // Round-trip integrity
+```
+
+### Benefits of Systematic Approach
+
+- **Consistency**: All column types follow identical implementation patterns
+- **Completeness**: Covers full pipeline from ingestion through query and subscriptions
+- **Maintainability**: Centralized patterns make debugging and enhancements easier  
+- **Extensibility**: Adding new column types requires minimal framework changes
+- **Quality**: Comprehensive test coverage catches integration issues early
+- **Documentation**: Self-documenting code patterns reduce learning curve
+
+### Binary Column Document Class Hierarchy
+
+The ingestion service uses a two-level hierarchy for binary data columns that require specialized storage handling:
+
+**Base Classes:**
+- **`BinaryColumnDocumentBase`**: Abstract base for columns storing binary data (arrays, images, structs)
+- **`ArrayColumnDocumentBase`**: Specialized base for array column types with dimensional metadata
+
+**Storage Abstraction:**
+```java
+public class StorageDocument {
+    public enum StorageKind { INLINE, GRIDFS }
+    private StorageKind kind;
+    private byte[] data;        // Used when kind = INLINE
+    private ObjectId fileId;    // Used when kind = GRIDFS
+    private Long sizeBytes;     // Size tracking for both storage types
+}
+```
+
+**Array Column Implementation Pattern:**
+```java
+@BsonDiscriminator(key = "_t", value = "arrayType")
+public class TypeArrayColumnDocument extends ArrayColumnDocumentBase {
+    
+    @Override
+    protected int getElementSizeBytes() {
+        return ELEMENT_SIZE; // e.g., 8 for double, 4 for float
+    }
+    
+    @Override
+    protected void writeValuesToBuffer(ByteBuffer buffer, Object values, int totalElements) {
+        // Type-specific binary serialization with little-endian order
+    }
+    
+    @Override
+    protected Message deserializeToProtobufColumn() throws DpException {
+        // Type-specific binary deserialization to protobuf column
+    }
+}
+```
+
+**Array Column Type Mappings:**
+| Proto Message | Element Size | Document Class | BSON Discriminator | Status |
+|--------------|--------------|----------------|-------------------|--------|
+| DoubleArrayColumn | 8 bytes | DoubleArrayColumnDocument | "doubleArrayColumn" | ✅ |
+| FloatArrayColumn | 4 bytes | FloatArrayColumnDocument | "floatArrayColumn" | |
+| Int64ArrayColumn | 8 bytes | Int64ArrayColumnDocument | "int64ArrayColumn" | |
+| Int32ArrayColumn | 4 bytes | Int32ArrayColumnDocument | "int32ArrayColumn" | |
+| BoolArrayColumn | 1 byte | BoolArrayColumnDocument | "boolArrayColumn" | |
+
+**Binary Storage Features:**
+- **Little-Endian Serialization**: Optimized ByteBuffer serialization with `ByteOrder.LITTLE_ENDIAN`
+- **Row-Major Flattening**: Multi-dimensional arrays stored as `sample_count × product(dimensions)` elements
+- **Storage Flexibility**: Inline storage for small data, GridFS ready for large arrays (>16MB)
+- **Memory Efficiency**: Binary storage avoids per-element BSON overhead for array data
+- **No Trigger Support**: Array columns can only be targets in data event subscriptions, not triggers
+
+**Benefits of Two-Level Hierarchy:**
+- **Code Reuse**: BinaryColumnDocumentBase shared by array, image, struct, and serialized columns
+- **Type Safety**: ArrayColumnDocumentBase provides array-specific validation and serialization
+- **Extensibility**: Easy to add new binary column types (ImageColumn, StructColumn)
+- **Performance**: Binary serialization optimized for high-frequency array ingestion scenarios
+
 ## Export Framework Architecture
-The Annotation Service includes a sophisticated export framework:
+The Annotation Service includes a sophisticated export framework with format-specific support for different column types:
 - **Base Classes**: `ExportDataJobBase` → `ExportDataJobAbstractTabular` → format-specific jobs
 - **Format Jobs**: `ExportDataJobCsv`, `ExportDataJobExcel`, `ExportDataJobHdf5`
 - **File Interfaces**: `TabularDataExportFileInterface` implemented by `DataExportXlsxFile`, etc.
 - **Data Processing**: `TimestampDataMap` for tabular data assembly, `TabularDataUtility` for data manipulation
 - **Excel Implementation**: Uses Apache POI with `XSSFWorkbook` for reliable XLSX generation
+
+### Export Format Compatibility by Column Type
+- **Scalar Columns** (DoubleColumn, StringColumn, etc.): Support all export formats (CSV, Excel, HDF5)
+  - **Tabular Formats**: CSV and Excel export via `toDataColumn()` conversion to sample-oriented format
+  - **HDF5**: Native support for efficient columnar storage of scalar time-series data
+- **Binary Array Columns** (DoubleArrayColumn, etc.): **HDF5 export only**
+  - **HDF5**: Optimal format for multi-dimensional array data with native array storage
+  - **Tabular Limitation**: Cannot export to CSV/Excel as binary columns cannot convert to legacy DataColumn format
+  - **Future Enhancement**: Array columns require specialized tabular export implementation for flattened element columns
 
 ### Excel File Generation
 The `DataExportXlsxFile` class uses `XSSFWorkbook` (non-streaming) for better reliability:
@@ -106,6 +395,102 @@ Recent API evolution has moved from "create" to "save" semantics:
   - Uses Apache POI for Excel file processing
   - Expects format: `[seconds, nanos, pv_data_columns...]` with header row
 
+## Ingestion Validation Framework
+The ingestion service implements comprehensive validation for all column-oriented data structures to support high-frequency data ingestion (4000 PVs at 1 KHz) with proper memory management and data integrity.
+
+### Validation Architecture
+- **Location**: `com.ospreydcs.dp.service.ingest.handler.IngestionValidationUtility`
+- **Approach**: Layered validation with fail-fast error handling
+- **Error Messages**: Detailed field paths with expected vs actual values
+
+### Validation Layers
+1. **Basic Request Validation**: Provider ID, client request ID, frame presence
+2. **Timestamp Validation**: SamplingClock and TimestampList validation with ordering checks
+3. **Legacy Column Validation**: DataColumn and SerializedDataColumn backward compatibility
+4. **New Column Validation**: All column-oriented data structures
+5. **Cross-Cutting Validation**: Unique PV names across all column types
+
+### Supported Column Types
+**Scalar Columns**: DoubleColumn, FloatColumn, Int32Column, Int64Column, BoolColumn, StringColumn, EnumColumn
+**Array Columns**: DoubleArrayColumn, FloatArrayColumn, Int32ArrayColumn, Int64ArrayColumn, BoolArrayColumn
+**Complex Columns**: ImageColumn, StructColumn, SerializedDataColumn
+
+### Validation Constraints
+- **String Length**: 256 character maximum for StringColumn values
+- **Array Dimensions**: 1-3 dimensions maximum, all dimension values > 0
+- **Array Elements**: 10 million element maximum per array column
+- **Image Size**: 50MB maximum per image payload  
+- **Struct Size**: 1MB maximum per struct payload
+- **Timestamp Integrity**: Non-decreasing timestamps, valid nanosecond ranges (0-999,999,999)
+- **Sample Consistency**: All columns must have values matching timestamp count
+- **Unique PV Names**: No duplicate PV names across any column type in a single frame
+
+### Column Counting Logic
+Updated `IngestionServiceImpl.ingestionResponseAck()` to count all column types:
+```java
+int numColumns = frame.getDataColumnsCount() + frame.getSerializedDataColumnsCount()
+    + frame.getDoubleColumnsCount() + frame.getFloatColumnsCount() 
+    + frame.getInt64ColumnsCount() + frame.getInt32ColumnsCount()
+    + frame.getBoolColumnsCount() + frame.getStringColumnsCount()
+    + frame.getEnumColumnsCount() + frame.getImageColumnsCount()
+    + frame.getStructColumnsCount() + frame.getDoubleArrayColumnsCount()
+    + frame.getFloatArrayColumnsCount() + frame.getInt32ArrayColumnsCount()
+    + frame.getInt64ArrayColumnsCount() + frame.getBoolArrayColumnsCount();
+```
+
+## Performance Benchmarking Framework
+The ingestion service includes a sophisticated benchmarking framework for performance comparison between different column-oriented data structures, particularly for high-frequency scenarios (4000 PVs at 1 KHz).
+
+### Benchmark Architecture
+- **Base Class**: `IngestionBenchmarkBase` provides common infrastructure
+- **Strategy Pattern**: `ColumnBuilder` interface with implementation-specific builders
+- **Factory Method**: `getColumnBuilder()` creates appropriate builder based on `ColumnDataType`
+- **Threading**: Configurable multi-threaded execution with executor service pools
+
+### Available Benchmarks
+- **`BenchmarkIngestDataStream`**: Unidirectional streaming ingestion performance
+- **`BenchmarkIngestDataBidiStream`**: Bidirectional streaming ingestion performance  
+- **`BenchmarkIngestDataStreamBytes`**: Specialized streaming for serialized data
+
+### Column Data Types
+- **`DATA_COLUMN`**: Legacy sample-oriented DataColumn/DataValue structure (default)
+- **`DOUBLE_COLUMN`**: New column-oriented DoubleColumn with packed double arrays
+- **`SERIALIZED_DATA_COLUMN`**: SerializedDataColumn structure for custom serialization
+
+### Column Builders
+- **`DataColumnBuilder`**: Creates legacy DataColumn structures with individual DataValue objects per sample
+- **`DoubleColumnBuilder`**: Creates efficient DoubleColumn with packed double arrays (avoids per-sample allocation)
+- **`SerializedDataColumnBuilder`**: Creates SerializedDataColumn with custom serialized payload
+
+### Usage Examples
+```bash
+# Run benchmark with legacy DataColumn structure (default)
+java -cp target/dp-service-shaded.jar com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataStream
+
+# Run benchmark with new efficient DoubleColumn structure
+java -cp target/dp-service-shaded.jar com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataStream --double-column
+
+# Run benchmark with SerializedDataColumn structure
+java -cp target/dp-service-shaded.jar com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataStream --serialized-column
+
+# Display usage help
+java -cp target/dp-service-shaded.jar com.ospreydcs.dp.service.ingest.benchmark.BenchmarkIngestDataStream --help
+```
+
+### Performance Comparison
+The framework enables direct memory allocation and throughput comparison:
+- **Legacy DataColumn**: Creates individual DataValue objects for each sample (high memory allocation)
+- **New DoubleColumn**: Uses packed double arrays (minimal allocation, better cache locality)
+- **Memory Impact**: At 4000 PVs × 1000 samples/sec, DataColumn creates 4M objects/sec vs DoubleColumn's 4K arrays/sec
+
+### Benchmark Configuration
+Key parameters configured in benchmark classes:
+- **`numThreads`**: Executor service thread pool size (typically 7)
+- **`numStreams`**: Concurrent gRPC streams (typically 20)  
+- **`numRows`**: Samples per ingestion request (typically 1000)
+- **`numColumns`**: PVs per stream (typically 200, total 4000 PVs)
+- **`numSeconds`**: Duration of benchmark run (typically 60 seconds)
+
 ## Testing Strategy
 - **Framework**: JUnit 4 (imports `org.junit.*`, uses `@Test`, `@Before`, `@After`)
 - **Integration Tests**: Located in `src/test/java/com/ospreydcs/dp/service/integration/`
@@ -114,6 +499,108 @@ Recent API evolution has moved from "create" to "save" semantics:
 - **Scenario Methods**: Reusable test data generation (e.g., `simpleIngestionScenario()`, `createDataSetScenario()`)
 - **Test Naming**: Test classes typically named `<APIMethod>Test`
 - **Temporary Files**: Use `@Rule public TemporaryFolder tempFolder = new TemporaryFolder();` for test files
+
+### Ingestion Test Framework
+The ingestion test framework has been streamlined to support systematic addition of new protobuf column types with minimal boilerplate code.
+
+**Framework Components:**
+- **`IngestionTestBase.IngestionRequestParams`**: Simplified parameter object with dedicated fields for each column type
+- **`buildIngestionRequest()`**: Streamlined method that uses column lists from params object
+- **`GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`**: Enhanced verification logic for all column types
+
+**Adding New Protobuf Column Types:**
+Follow this systematic 7-step process for complete implementation:
+
+**Implementation Steps (1-5):**
+1. **Create Document Class**: Implement `ScalarColumnDocumentBase<T>` with `addColumnToBucket()` method
+2. **Add Ingestion Handling**: Update `BucketDocument.generateBucketsFromRequest()` to handle new column type
+3. **Register POJO Class**: Add document class to `MongoClientBase.getPojoCodecRegistry()`
+4. **Data Subscription**: Update `SourceMonitorManager.publishDataSubscriptions()` for new column type
+5. **Event Subscription**: Update `ColumnTriggerUtility` and `DataBuffer` for trigger and size estimation support
+
+**Testing Steps (6-7):**
+6. **Test Framework Support**: 
+   - Add `List<NewColumnType>` field to `IngestionTestBase.IngestionRequestParams`
+   - Update `buildIngestionRequest()` to include new columns in `IngestDataRequest`
+   - Add verification logic to `GrpcIntegrationIngestionServiceWrapper.verifyIngestionRequestHandling()`
+7. **Integration Test**: Create `<ColumnType>IT` test covering ingestion, query, subscription, and event APIs
+
+**Query API Integration:**
+New protobuf column types automatically work in query results through the `addColumnToBucket()` method:
+- No additional query API code required
+- Document classes implement abstract `addColumnToBucket()` from `ColumnDocumentBase`
+- Query results assemble `DataBucket` using column-specific `addColumnToBucket()` implementations
+
+**Verification Pattern:**
+The verification logic follows a consistent pattern for each column type:
+- Retrieve `DataColumnDocument` from stored `BucketDocument`
+- Convert document to corresponding protobuf column using `toProtobufColumn()`
+- Match protobuf column against original columns from the request's column list
+- Verify data integrity through protobuf round-trip comparison
+
+**Example Verification Flow:**
+```java
+// For FloatColumn verification:
+DataColumnDocument dataColumnDocument = bucketDocument.getDataColumnDocument();
+FloatColumn storedColumn = (FloatColumn) dataColumnDocument.toProtobufColumn();
+// Find matching column from request.getFloatColumnsList()
+// Verify storedColumn matches original request data
+```
+
+**Benefits:**
+- **Systematic**: Same 7-step pattern for every new column type
+- **Comprehensive**: Tests full pipeline from ingestion → storage → query → subscription → events
+- **Maintainable**: Centralized verification logic in wrapper class
+- **Extensible**: Easy to add new column types without modifying existing infrastructure
+
+### Ingestion Validation Test Coverage
+- **Test Location**: `IngestionValidationUtilityTest` (22 test cases)
+- **Legacy Validation**: Provider ID, request ID, DataColumn validation (6 tests)
+- **New Column Types**: DoubleColumn, StringColumn, EnumColumn, Array, Image, Struct validation (10 tests)  
+- **Advanced Scenarios**: Duplicate PV names, timestamp integrity, multi-column success cases (6 tests)
+- **Error Message Testing**: Validates detailed field paths and constraint violations
+- **Boundary Testing**: String length limits, array dimension limits, timestamp ordering
+
+### V2 API Integration Test Coverage
+- **Test Location**: `src/test/java/com/ospreydcs/dp/service/integration/v2api/`
+- **Naming Convention**: `<ColumnType>IT` (e.g., `DoubleColumnIT`, `DoubleArrayColumnIT`, `StructColumnIT`, `ImageColumnIT`, `SerializedDataColumnIT`)
+- **Comprehensive Coverage**: Each test class covers ingestion, query, and subscription APIs for one column type
+- **Query API Integration**: Tests verify `addColumnToBucket()` method implementation for query result assembly
+- **Framework Pattern**: Same integration test structure applies to scalar, array, and binary column types
+- **SerializedDataColumn Support**: Complete integration test framework support added, including `setSerializedDataColumnList()` in `IngestionRequestParams`
+
+#### Array and Binary Column Test Patterns
+- **Dual PV Approach**: Array and binary integration tests use scalar columns as triggers and array/binary columns as targets
+- **Event Subscriptions**: Array and binary columns cannot serve as trigger PVs, requiring scalar trigger + target column pattern
+- **PV Validation**: Both scalar and target PVs included in initial ingestion for proper subscription validation
+- **Export Testing**: Array and binary columns skip tabular export tests due to binary storage limitations
+- **Binary Column Types**: StructColumn (with schemaId) and ImageColumn (with ImageDescriptor) extend BinaryColumnDocumentBase
+
+### Scalar Column Document Test Coverage  
+- **Unit Tests**: `ScalarColumnDocumentBaseTest` - Basic functionality of generic base class
+- **Protobuf Conversion Tests**: `ScalarColumnDocumentBaseProtobufTest` (7 test cases)
+- **Integration Tests**: `integration/v2api/DoubleColumnIT`, `integration/v2api/FloatColumnIT`, `integration/v2api/Int64ColumnIT` - End-to-end column pipelines (ingestion, query, subscription)
+
+**ScalarColumnDocumentBaseProtobufTest Coverage:**
+- **Core Functionality**: Document → protobuf conversion via `toProtobufColumn()`
+- **Round-trip Integrity**: Protobuf → document → protobuf data integrity
+- **Legacy Compatibility**: DataColumn conversion using inherited methods
+- **Serialization**: Byte array serialization through `getBytes()`
+- **Edge Cases**: Empty values, null names, large datasets (1000+ values)
+- **Error Handling**: Null name handling with safe fallback to empty string
+
+**Critical for Query/Export Pipeline:**
+The `toProtobufColumn()` method is essential for:
+- Tabular query results (MongoDB → protobuf API responses)
+- CSV export (document → protobuf → tabular assembly)
+- Excel export (document → protobuf → XLSX generation)  
+- HDF5 export (document → protobuf → HDF5 file creation)
+
+**Testing Strategy Benefits:**
+- **Direct Coverage**: Tests core conversion logic without full query/export complexity
+- **Fast Execution**: Unit tests vs slow integration test pipelines
+- **Comprehensive**: All scalar column types use same base class logic
+- **Template Pattern**: Same test structure applies to all ScalarColumnDocumentBase implementations
 
 ## Continuous Integration
 - **GitHub Actions**: Automated CI/CD pipeline in `.github/workflows/ci.yml`

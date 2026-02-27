@@ -70,8 +70,6 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     requestId,
                                     null,
                                     null,
-                                    null,
-                                    null,
                                     startSeconds,
                                     0L,
                                     1_000_000L,
@@ -79,9 +77,9 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     columnNames,
                                     IngestionTestBase.IngestionDataType.DOUBLE,
                                     values,
-                                    null, false);
+                                    null, null);
                     final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
-                    ingestionServiceWrapper.sendAndVerifyIngestData(params, request, 0);
+                    ingestionServiceWrapper.sendAndVerifyIngestData(params, request);
                 }
 
                 // send request that will be rejected because of empty string in columnNames list
@@ -96,8 +94,6 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     requestId,
                                     null,
                                     null,
-                                    null,
-                                    null,
                                     startSeconds,
                                     0L,
                                     1_000_000L,
@@ -105,7 +101,7 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     columnNames,
                                     IngestionTestBase.IngestionDataType.DOUBLE,
                                     values,
-                                    null, false);
+                                    null, null);
                     final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
 
                     // send but don't verify ingestion, manually inspect reject response
@@ -118,7 +114,7 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                             ExceptionalResult.ExceptionalResultStatus.RESULT_STATUS_REJECT,
                             exceptionalResult.getExceptionalResultStatus());
                     assertEquals(
-                            "name must be specified for all DataColumns",
+                            "ingestionDataFrame.dataColumns[0].name must be specified",
                             exceptionalResult.getMessage());
                 }
 
@@ -135,8 +131,6 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     requestId,
                                     null,
                                     null,
-                                    null,
-                                    null,
                                     startSeconds,
                                     0L,
                                     1_000_000L,
@@ -144,7 +138,7 @@ public class QueryRequestStatusIT extends GrpcIntegrationTestBase {
                                     columnNames,
                                     IngestionTestBase.IngestionDataType.DOUBLE,
                                     values,
-                                    null, false);
+                                    null, null);
                     final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
 
                     // send but don't verify ingestion since it will fail, manually inspect ack response

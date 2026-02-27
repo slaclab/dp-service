@@ -8,6 +8,10 @@ import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
 import com.ospreydcs.dp.service.query.handler.mongo.client.MongoQueryClientInterface;
 
+/**
+ * This class services an exportData() request using a tabular CSV output format.  It creates a DataExportCsvFile
+ * object for use by ExportDataJobAbstractTabular.execute() to write the output file.
+ */
 public class ExportDataJobCsv extends ExportDataJobAbstractTabular {
 
     public ExportDataJobCsv(

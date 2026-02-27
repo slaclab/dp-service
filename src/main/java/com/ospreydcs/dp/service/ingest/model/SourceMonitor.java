@@ -1,8 +1,6 @@
 package com.ospreydcs.dp.service.ingest.model;
 
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
-import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.SubscribeDataResponse;
 import com.ospreydcs.dp.service.ingest.handler.interfaces.IngestionHandlerInterface;
 import com.ospreydcs.dp.service.ingest.service.IngestionServiceImpl;
@@ -17,6 +15,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * This class handles an individual subscription made via the subscribeData() API method.  The PV names for the
+ * subscription are contained in pvNames.  The responseObserver is used for sending messages in the API response stream.
+ * Methods are provided for publishing a DataBucket in the response stream, handling rejects and errors, and requesting
+ * shutdown.
+ *
+ */
 public class SourceMonitor {
 
     // static variables
@@ -38,38 +43,19 @@ public class SourceMonitor {
         this.responseObserver = responseObserver;
     }
 
-    public void publishDataColumns(
+    public void publishDataBucket(
             final String pvName,
-            final DataTimestamps requestDataTimestamps,
-            final List<DataColumn> responseDataColumns
+            DataBucket dataBucket
     ) {
         if (!safeToSendResponse()) {
             return;
         }
 
         logger.debug(
-                "publishing DataColumns for id: {} pv: {}",
+                "publishing DataBucket for id: {} pv: {}",
                 responseObserver.hashCode(),
                 pvName);
-        IngestionServiceImpl.sendSubscribeDataResponse(
-                requestDataTimestamps, responseDataColumns, responseObserver);
-    }
-
-    public void publishSerializedDataColumns(
-            final String pvName,
-            final DataTimestamps requestDataTimestamps,
-            final List<SerializedDataColumn> responseSerializedColumns
-    ) {
-        if (!safeToSendResponse()) {
-            return;
-        }
-
-        logger.debug(
-                "publishing SerializedDataColumns for id: {} pv: {}",
-                responseObserver.hashCode(),
-                pvName);
-        IngestionServiceImpl.sendSubscribeDataResponseSerializedColumns(
-                requestDataTimestamps, responseSerializedColumns, responseObserver);
+        IngestionServiceImpl.sendSubscribeDataResponse(dataBucket, responseObserver);
     }
 
     public void handleReject(String errorMsg) {

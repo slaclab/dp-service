@@ -5,11 +5,11 @@ import ch.systemsx.cisd.hdf5.IHDF5Reader;
 import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
 import com.ospreydcs.dp.service.annotation.handler.mongo.export.DataExportHdf5File;
-import com.ospreydcs.dp.service.common.bson.DataColumnDocument;
+import com.ospreydcs.dp.service.common.bson.column.DataColumnDocument;
 import com.ospreydcs.dp.service.common.bson.DataTimestampsDocument;
 import com.ospreydcs.dp.service.common.bson.TimestampDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.BucketDocument;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
+import com.ospreydcs.dp.service.common.bson.column.DoubleColumnDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
@@ -21,10 +21,29 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * This class provides unit test coverage for the exportData() API with output to HDF5 format.  NOTE: the test writes
+ * hdf5 files to /tmp on disk.
+ */
 public class DataExportHdf5FileTest {
 
+    /**
+     * This test case provides positive test coverage for exporting data to HDF5 format.  It creates and initializes
+     * the DataExportHdf5File, which creates the file on disk and initializes the indexing structure.  It then creates
+     * a dataset and a couple of BucketDocuments, writes them to the HDF5 file, and verifies the file content.
+     */
     @Test
     public void testCreateExportFile() {
+
+        // create export file and top-level group index structure
+        final String exportFilePathString = "/tmp/testCreateExportFile.h5";
+        DataExportHdf5File exportHdf5File = null;
+        try {
+            exportHdf5File = new DataExportHdf5File(exportFilePathString);
+        } catch (DpException e) {
+            fail("exception creating " + exportFilePathString);
+        }
+        Objects.requireNonNull(exportHdf5File);
 
         final Instant instantNow = Instant.now();
         final Instant firstInstant = instantNow.minusNanos(instantNow.getNano());
@@ -54,16 +73,6 @@ public class DataExportHdf5FileTest {
         dataBlocks.add(dataBlock1);
         dataset.setDataBlocks(dataBlocks);
 
-        // create export file and top-level group index structure
-        final String exportFilePathString = "/tmp/testCreateExportFile.h5";
-        DataExportHdf5File exportHdf5File = null;
-        try {
-            exportHdf5File = new DataExportHdf5File(exportFilePathString);
-        } catch (DpException e) {
-            fail("exception creating " + exportFilePathString);
-        }
-        Objects.requireNonNull(exportHdf5File);
-
         final int sampleCount = 10;
         final long samplePeriod = 100000000L;
         final SamplingClock samplingClock =
@@ -74,13 +83,6 @@ public class DataExportHdf5FileTest {
                         .build();
         final DataTimestamps dataTimestamps = DataTimestamps.newBuilder().setSamplingClock(samplingClock).build();
         final DataTimestampsDocument dataTimestampsDocument = DataTimestampsDocument.fromDataTimestamps(dataTimestamps);
-
-        final Map<String, String> attributeMap = Map.of("sector", "S01", "subsystem", "vacuum");
-
-        final EventMetadataDocument eventMetadata = new EventMetadataDocument();
-        eventMetadata.setDescription("S01 vacuum test");
-        eventMetadata.setStartTime(TimestampDocument.fromTimestamp(samplingClockStartTime));
-        eventMetadata.setStopTime(TimestampDocument.fromTimestamp(stopTimestamp));
 
         final String providerId = "S01 vacuum provider";
 
@@ -102,8 +104,6 @@ public class DataExportHdf5FileTest {
             final DataColumn dataColumn = dataColumnBuilder.build();
             final DataColumnDocument dataColumnDocument = DataColumnDocument.fromDataColumn(dataColumn);
             pv1BucketDocument.setDataColumn(dataColumnDocument);
-            pv1BucketDocument.setAttributes(attributeMap);
-            pv1BucketDocument.setEvent(eventMetadata);
             pv1BucketDocument.setProviderId(providerId);
             exportHdf5File.writeBucket(pv1BucketDocument);
         }
@@ -123,10 +123,26 @@ public class DataExportHdf5FileTest {
             DataColumn dataColumn = dataColumnBuilder.build();
             final DataColumnDocument dataColumnDocument = DataColumnDocument.fromDataColumn(dataColumn);
             pv2BucketDocument.setDataColumn(dataColumnDocument);
-            pv2BucketDocument.setAttributes(attributeMap);
-            pv2BucketDocument.setEvent(eventMetadata);
             pv2BucketDocument.setProviderId(providerId);
             exportHdf5File.writeBucket(pv2BucketDocument);
+        }
+
+        // create third BucketDocument containing a DoubleColumn to test handling the new API protobuf column data structures
+        BucketDocument doubleBucketDocument = null;
+        {
+            doubleBucketDocument = new BucketDocument();
+            doubleBucketDocument.setPvName("S01-GCC03");
+            doubleBucketDocument.setDataTimestamps(dataTimestampsDocument);
+            DoubleColumn.Builder doubleColumnBuilder = DoubleColumn.newBuilder();
+            doubleColumnBuilder.setName("S01-GCC03");
+            doubleColumnBuilder.addValues(12.34);
+            doubleColumnBuilder.addValues(34.56);
+            DoubleColumn doubleColumn = doubleColumnBuilder.build();
+            final DoubleColumnDocument doubleColumnDocument = DoubleColumnDocument.fromDoubleColumn(doubleColumn);
+            doubleBucketDocument.setDataColumn(doubleColumnDocument);
+            doubleBucketDocument.setProviderId(providerId);
+            doubleBucketDocument.setClientRequestId(UUID.randomUUID().toString());
+            exportHdf5File.writeBucket(doubleBucketDocument);
         }
 
         exportHdf5File.close();
@@ -136,6 +152,7 @@ public class DataExportHdf5FileTest {
         AnnotationTestBase.verifyDatasetHdf5Content(reader, dataset);
         AnnotationTestBase.verifyBucketDocumentHdf5Content(reader, pv1BucketDocument);
         AnnotationTestBase.verifyBucketDocumentHdf5Content(reader, pv2BucketDocument);
+        AnnotationTestBase.verifyBucketDocumentHdf5Content(reader, doubleBucketDocument);
 
         // close reader
         reader.close();

@@ -60,13 +60,12 @@ public class QueryDataBidiStreamIT extends GrpcIntegrationTestBase {
                     beginSeconds,
                     beginNanos,
                     endSeconds,
-                    endNanos,
-                    false
+                    endNanos
             );
 
             queryServiceWrapper.sendAndVerifyQueryDataBidiStream(
                     numBucketsExpected,
-                    0, params,
+                    params,
                     ingestionScenarioResult.validationMap(),
                     expectReject,
                     expectedRejectMessage);
@@ -92,13 +91,12 @@ public class QueryDataBidiStreamIT extends GrpcIntegrationTestBase {
                             beginSeconds,
                             beginNanos,
                             endSeconds,
-                            endNanos,
-                            false
+                            endNanos
                     );
 
             queryServiceWrapper.sendAndVerifyQueryDataBidiStream(
                     numBucketsExpected,
-                    0, params,
+                    params,
                     ingestionScenarioResult.validationMap(),
                     expectReject,
                     expectedRejectMessage);

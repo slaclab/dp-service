@@ -41,15 +41,13 @@ public class IngestDataBidiStreamValidationIT extends GrpcIntegrationTestBase {
                         requestId,
                         null,
                         null,
-                        null,
-                        null,
                         instantNow.getEpochSecond(),
                         0L,
                         1_000_000L,
                         1,
                         columnNames,
                         IngestionTestBase.IngestionDataType.DOUBLE,
-                        values, null, false);
+                        values, null, null);
         final IngestDataRequest request = IngestionTestBase.buildIngestionRequest(params);
         final List<IngestDataRequest> requests = Arrays.asList(request);
 
@@ -64,7 +62,9 @@ public class IngestDataBidiStreamValidationIT extends GrpcIntegrationTestBase {
                 ExceptionalResult.ExceptionalResultStatus.RESULT_STATUS_REJECT,
                 response.getExceptionalResult().getExceptionalResultStatus());
         assertTrue(response.getResponseTime().getEpochSeconds() > 0);
-        assertTrue(response.getExceptionalResult().getMessage().equals("name must be specified for all DataColumns"));
+        assertEquals(
+                "ingestionDataFrame.dataColumns[0].name must be specified",
+                response.getExceptionalResult().getMessage());
     }
 
 }

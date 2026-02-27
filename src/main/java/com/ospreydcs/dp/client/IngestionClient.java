@@ -164,27 +164,13 @@ public class IngestionClient extends ServiceApiClientBase {
         public IngestionDataType dataType = null;
         public List<List<Object>> values = null;
         public List<List<DataValue.ValueStatus>> valuesStatus = null;
-        public List<String> tags = null;
-        public Map<String, String> attributes = null;
-        public String eventDescription = null;
-        public Long eventStartSeconds = null;
-        public Long eventStartNanos = null;
-        public Long eventStopSeconds = null;
-        public Long eventStopNanos = null;
-        public Boolean useSerializedDataColumns = false;
 
         public IngestionRequestParams(
                 String providerId,
-                String requestId,
-                List<String> tags,
-                Map<String, String> attributes,
-                String eventDescription
+                String requestId
         ) {
             this.providerId = providerId;
             this.requestId = requestId;
-            this.tags = tags;
-            this.attributes = attributes;
-            this.eventDescription = eventDescription;
         }
 
         public IngestionRequestParams(
@@ -200,17 +186,9 @@ public class IngestionClient extends ServiceApiClientBase {
                 Integer samplingClockCount,
                 List<String> columnNames,
                 IngestionDataType dataType,
-                List<List<Object>> values,
-                List<String> tags,
-                Map<String, String> attributes,
-                String eventDescription,
-                Long eventStartSeconds,
-                Long eventStartNanos,
-                Long eventStopSeconds,
-                Long eventStopNanos,
-                boolean useSerializedDataColumns
+                List<List<Object>> values
         ) {
-            this(providerId, requestId, tags, attributes, eventDescription);
+            this(providerId, requestId);
 
             this.snapshotStartTimestampSeconds = snapshotStartTimestampSeconds;
             this.snapshotStartTimestampNanos = snapshotStartTimestampNanos;
@@ -224,11 +202,6 @@ public class IngestionClient extends ServiceApiClientBase {
             this.dataType = dataType;
             this.values = values;
             this.valuesStatus = valuesStatus;
-            this.useSerializedDataColumns = useSerializedDataColumns;
-            this.eventStartSeconds = eventStartSeconds;
-            this.eventStartNanos = eventStartNanos;
-            this.eventStopSeconds = eventStopSeconds;
-            this.eventStopNanos = eventStopNanos;
         }
     }
 
@@ -377,8 +350,7 @@ public class IngestionClient extends ServiceApiClientBase {
             requestBuilder.setClientRequestId(params.requestId);
         }
 
-        final IngestDataRequest.IngestionDataFrame.Builder dataFrameBuilder
-                = IngestDataRequest.IngestionDataFrame.newBuilder();
+        final DataFrame.Builder dataFrameBuilder = DataFrame.newBuilder();
         final DataTimestamps.Builder dataTimestampsBuilder = DataTimestamps.newBuilder();
 
         // set DataTimestamps for request
@@ -492,78 +464,8 @@ public class IngestionClient extends ServiceApiClientBase {
                 frameColumns.add(dataColumnBuilder.build());
             }
         }
-
-        // add DataColumns or SerializedDataColumns
-        if (params.useSerializedDataColumns) {
-            // add SerializedDataColumns as specified in params
-            for (DataColumn dataColumn : frameColumns) {
-                final SerializedDataColumn serializedDataColumn =
-                        SerializedDataColumn.newBuilder()
-                                .setName(dataColumn.getName())
-                                .setDataColumnBytes(dataColumn.toByteString())
-                                .build();
-                dataFrameBuilder.addSerializedDataColumns(serializedDataColumn);
-            }
-
-        } else {
-            // add regular DataColumns
-            dataFrameBuilder.addAllDataColumns(frameColumns);
-        }
-
-        // add tags if specified
-        if (params.tags != null) {
-            requestBuilder.addAllTags(params.tags);
-        }
-
-        // add attributes if specified
-        if (params.attributes != null) {
-            for (var attributeEntry : params.attributes.entrySet()) {
-                String attributeKey = attributeEntry.getKey();
-                String attributeValue = attributeEntry.getValue();
-                final Attribute.Builder attributeBuilder = Attribute.newBuilder();
-                attributeBuilder.setName(attributeKey);
-                attributeBuilder.setValue(attributeValue);
-                attributeBuilder.build();
-                requestBuilder.addAttributes(attributeBuilder);
-            }
-        }
-
-        // set event metadata if specified
-        if (params.eventDescription != null ||  params.eventStartSeconds != null || params.eventStartNanos != null) {
-
-            EventMetadata.Builder eventMetadataBuilder = EventMetadata.newBuilder();
-
-            if (params.eventDescription != null) {
-                eventMetadataBuilder.setDescription(params.eventDescription);
-            }
-
-            if (params.eventStartSeconds != null || params.eventStartNanos != null) {
-                Timestamp.Builder eventStartTimeBuilder = Timestamp.newBuilder();
-                if (params.eventStartSeconds != null) {
-                    eventStartTimeBuilder.setEpochSeconds(params.eventStartSeconds);
-                }
-                if (params.eventStartNanos != null) {
-                    eventStartTimeBuilder.setNanoseconds(params.eventStartNanos);
-                }
-                eventStartTimeBuilder.build();
-                eventMetadataBuilder.setStartTimestamp(eventStartTimeBuilder);
-            }
-
-            if (params.eventStopSeconds != null || params.eventStopNanos != null) {
-                Timestamp.Builder eventStopTimeBuilder = Timestamp.newBuilder();
-                if (params.eventStopSeconds != null) {
-                    eventStopTimeBuilder.setEpochSeconds(params.eventStopSeconds);
-                }
-                if (params.eventStopNanos != null) {
-                    eventStopTimeBuilder.setNanoseconds(params.eventStopNanos);
-                }
-                eventStopTimeBuilder.build();
-                eventMetadataBuilder.setStopTimestamp(eventStopTimeBuilder);
-            }
-
-            eventMetadataBuilder.build();
-            requestBuilder.setEventMetadata(eventMetadataBuilder);
-        }
+        // add regular DataColumns
+        dataFrameBuilder.addAllDataColumns(frameColumns);
 
         dataFrameBuilder.build();
         requestBuilder.setIngestionDataFrame(dataFrameBuilder);

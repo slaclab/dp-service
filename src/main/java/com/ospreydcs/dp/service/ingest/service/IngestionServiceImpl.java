@@ -1,9 +1,6 @@
 package com.ospreydcs.dp.service.ingest.service;
 
-import com.ospreydcs.dp.grpc.v1.common.DataColumn;
-import com.ospreydcs.dp.grpc.v1.common.DataTimestamps;
-import com.ospreydcs.dp.grpc.v1.common.ExceptionalResult;
-import com.ospreydcs.dp.grpc.v1.common.SerializedDataColumn;
+import com.ospreydcs.dp.grpc.v1.common.*;
 import com.ospreydcs.dp.grpc.v1.ingestion.*;
 import com.ospreydcs.dp.service.common.protobuf.TimestampUtility;
 import com.ospreydcs.dp.service.common.model.ResultStatus;
@@ -17,6 +14,7 @@ import io.grpc.stub.StreamObserver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServiceImplBase {
@@ -97,8 +95,23 @@ public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServ
 
         final int numRows = getNumRequestRows(request);
 
-        int numColumns = request.getIngestionDataFrame().getDataColumnsCount()
-                + request.getIngestionDataFrame().getSerializedDataColumnsCount();
+        DataFrame frame = request.getIngestionDataFrame();
+        int numColumns = frame.getDataColumnsCount()
+                + frame.getSerializedDataColumnsCount()
+                + frame.getDoubleColumnsCount()
+                + frame.getFloatColumnsCount()
+                + frame.getInt64ColumnsCount()
+                + frame.getInt32ColumnsCount()
+                + frame.getBoolColumnsCount()
+                + frame.getStringColumnsCount()
+                + frame.getEnumColumnsCount()
+                + frame.getImageColumnsCount()
+                + frame.getStructColumnsCount()
+                + frame.getDoubleArrayColumnsCount()
+                + frame.getFloatArrayColumnsCount()
+                + frame.getInt32ArrayColumnsCount()
+                + frame.getInt64ArrayColumnsCount()
+                + frame.getBoolArrayColumnsCount();
 
         final IngestDataResponse.AckResult ackResult = IngestDataResponse.AckResult.newBuilder()
                 .setNumRows(numRows)
@@ -508,25 +521,12 @@ public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServ
     }
 
     private static SubscribeDataResponse subscribeDataResponse(
-            DataTimestamps dataTimestamps,
-            List<DataColumn> dataColumns
+            DataBucket dataBucket
     ) {
+        final List<DataBucket> responseDataBuckets = List.of(dataBucket);
         final SubscribeDataResponse.SubscribeDataResult result =
                 SubscribeDataResponse.SubscribeDataResult.newBuilder()
-                        .setDataTimestamps(dataTimestamps)
-                        .addAllDataColumns(dataColumns)
-                        .build();
-        return subscribeDataResponse(result);
-    }
-
-    private static SubscribeDataResponse subscribeDataResponseSerializedColumns(
-            DataTimestamps dataTimestamps,
-            List<SerializedDataColumn> serializedDataColumns
-    ) {
-        final SubscribeDataResponse.SubscribeDataResult result =
-                SubscribeDataResponse.SubscribeDataResult.newBuilder()
-                        .setDataTimestamps(dataTimestamps)
-                        .addAllSerializedDataColumns(serializedDataColumns)
+                        .addAllDataBuckets(responseDataBuckets)
                         .build();
         return subscribeDataResponse(result);
     }
@@ -553,22 +553,10 @@ public class IngestionServiceImpl extends DpIngestionServiceGrpc.DpIngestionServ
     }
 
     public static void sendSubscribeDataResponse(
-            DataTimestamps dataTimestamps,
-            List<DataColumn> dataColumns,
+            DataBucket dataBucket,
             StreamObserver<SubscribeDataResponse> responseObserver
     ) {
-        final SubscribeDataResponse response
-                = subscribeDataResponse(dataTimestamps, dataColumns);
-        responseObserver.onNext(response);
-    }
-
-    public static void sendSubscribeDataResponseSerializedColumns(
-            DataTimestamps dataTimestamps,
-            List<SerializedDataColumn> serializedDataColumns,
-            StreamObserver<SubscribeDataResponse> responseObserver
-    ) {
-        final SubscribeDataResponse response
-                = subscribeDataResponseSerializedColumns(dataTimestamps, serializedDataColumns);
+        final SubscribeDataResponse response = subscribeDataResponse(dataBucket);
         responseObserver.onNext(response);
     }
 

@@ -53,6 +53,11 @@ import static org.junit.Assert.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
+/**
+ * This class provides utilities for calling various Annotation Service API methods in integration tests that use the
+ * in-process gRPC communication framework.  For each API method, it provides utility methods for sending the API
+ * method request and verifying the result.
+ */
 public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServiceWrapperBase<AnnotationServiceImpl> {
 
     // static variables
@@ -465,8 +470,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
             if (queryParams.textCriterion != null) {
                 assertTrue(
                         foundAnnotation.getComment().contains(queryParams.textCriterion)
-                                || foundAnnotation.getName().contains(queryParams.textCriterion)
-                                || foundAnnotation.getEventMetadata().getDescription().contains(queryParams.textCriterion));
+                                || foundAnnotation.getName().contains(queryParams.textCriterion));
             }
 
             // check TagsCriterion
@@ -483,12 +487,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
                         resultAttributeMap.get(queryParams.attributesCriterionKey), queryParams.attributesCriterionValue);
             }
 
-            // check EventCriterion
-            if (queryParams.eventCriterion != null) {
-                assertTrue(foundAnnotation.getEventMetadata().getDescription().contains(queryParams.eventCriterion));
-            }
-
-            // compare dataset content from result with dataset in database
+           // compare dataset content from result with dataset in database
             for (DataSet responseDataSet : foundAnnotation.getDataSetsList()) {
                 final DataSetDocument dbDataSetDocument = mongoClient.findDataSet(responseDataSet.getId());
                 final DataSet dbDataSet = dbDataSetDocument.toDataSet();
@@ -532,7 +531,7 @@ public class GrpcIntegrationAnnotationServiceWrapper extends GrpcIntegrationServ
         return resultAnnotations;
     }
 
-    protected ExportDataResponse.ExportDataResult sendExportData(
+    public ExportDataResponse.ExportDataResult sendExportData(
             ExportDataRequest request,
             boolean expectReject,
             String expectedRejectMessage

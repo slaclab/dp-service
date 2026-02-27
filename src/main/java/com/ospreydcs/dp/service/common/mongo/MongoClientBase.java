@@ -4,6 +4,7 @@ import com.mongodb.client.model.Indexes;
 import com.ospreydcs.dp.service.common.bson.annotation.AnnotationDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDataFrameDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
+import com.ospreydcs.dp.service.common.bson.column.*;
 import com.ospreydcs.dp.service.common.bson.dataset.DataBlockDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.bson.bucket.*;
@@ -83,7 +84,6 @@ public abstract class MongoClientBase {
         CodecProvider pojoCodecProvider = PojoCodecProvider.builder().register(
                 ProviderDocument.class,
                 BucketDocument.class,
-                EventMetadataDocument.class,
                 RequestStatusDocument.class,
                 AnnotationDocument.class,
                 DataSetDocument.class,
@@ -94,7 +94,28 @@ public abstract class MongoClientBase {
                 CalculationsDataFrameDocument.class,
                 TimestampDocument.class,
                 DataTimestampsDocument.class,
-                DataColumnDocument.class
+                ColumnDocumentBase.class,
+                DataColumnDocument.class,
+                DoubleColumnDocument.class,
+                FloatColumnDocument.class,
+                Int64ColumnDocument.class,
+                Int32ColumnDocument.class,
+                BoolColumnDocument.class,
+                StringColumnDocument.class,
+                EnumColumnDocument.class,
+                StorageDocument.class,
+                ArrayDimensionsDocument.class,
+                BinaryColumnDocumentBase.class,
+                ArrayColumnDocumentBase.class,
+                DoubleArrayColumnDocument.class,
+                FloatArrayColumnDocument.class,
+                Int32ArrayColumnDocument.class,
+                Int64ArrayColumnDocument.class,
+                BoolArrayColumnDocument.class,
+                StructColumnDocument.class,
+                ImageColumnDocument.class,
+                ImageColumnDocument.ImageDescriptorDocument.class,
+                SerializedDataColumnDocument.class
         ).build();
 
         //        CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();

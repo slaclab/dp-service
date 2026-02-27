@@ -3,9 +3,7 @@ package com.ospreydcs.dp.service.common.bson.annotation;
 import com.ospreydcs.dp.grpc.v1.annotation.SaveAnnotationRequest;
 import com.ospreydcs.dp.grpc.v1.annotation.QueryAnnotationsResponse;
 import com.ospreydcs.dp.grpc.v1.common.Attribute;
-import com.ospreydcs.dp.grpc.v1.common.EventMetadata;
 import com.ospreydcs.dp.service.common.bson.DpBsonDocumentBase;
-import com.ospreydcs.dp.service.common.bson.EventMetadataDocument;
 import com.ospreydcs.dp.service.common.bson.calculations.CalculationsDocument;
 import com.ospreydcs.dp.service.common.bson.dataset.DataSetDocument;
 import com.ospreydcs.dp.service.common.exception.DpException;
@@ -107,13 +105,6 @@ public class AnnotationDocument extends DpBsonDocumentBase {
             document.setAttributes(attributeMap);
         }
 
-        // add event metadata from request to document
-        if (request.hasEventMetadata()) {
-            final EventMetadataDocument eventMetadataDocument =
-                    EventMetadataDocument.fromEventMetadata(request.getEventMetadata());
-            document.setEvent(eventMetadataDocument);
-        }
-
         if (calculationsDocumentId != null) {
             document.setCalculationsId(calculationsDocumentId);
         }
@@ -142,11 +133,6 @@ public class AnnotationDocument extends DpBsonDocumentBase {
         // only set attributes if specified in document
         if (this.getAttributes() != null) {
             annotationBuilder.addAllAttributes(AttributesUtility.attributeListFromMap(this.getAttributes()));
-        }
-
-        // only set event metadata if specified in document
-        if (this.getEvent() != null) {
-            annotationBuilder.setEventMetadata(EventMetadataDocument.toEventMetadata(this.getEvent()));
         }
 
         // add content of related datasets
@@ -237,23 +223,6 @@ public class AnnotationDocument extends DpBsonDocumentBase {
         } else {
             if (request.getAttributesCount() > 0) {
                 final String msg = "attributes mismatch: null expected: " + request.getAttributesList();
-                diffs.add(msg);
-            }
-        }
-
-        // diff eventMetadata
-        if (this.getEvent() != null) {
-            final EventMetadata thisEventMetadata =
-                    EventMetadataDocument.toEventMetadata(this.getEvent());
-            if (!Objects.equals(request.getEventMetadata(), thisEventMetadata)) {
-                final String msg =
-                        "eventMetadata mismatch: " + thisEventMetadata
-                                + " expected: " + request.getEventMetadata();
-                diffs.add(msg);
-            }
-        } else {
-            if (request.hasEventMetadata()) {
-                final String msg = "eventMetadata mismatch: null expected: " + request.getEventMetadata();
                 diffs.add(msg);
             }
         }

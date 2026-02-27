@@ -99,7 +99,7 @@ public class BenchmarkQueryDataUnary extends QueryBenchmarkBase {
         final int[] numThreadsArray = {/*1, 3,*/ 5/*, 7*/};
 
         BenchmarkQueryDataUnary benchmark = new BenchmarkQueryDataUnary();
-        runBenchmark(benchmark, totalNumPvsArray, numPvsPerRequestArray, numThreadsArray, false);
+        runBenchmark(benchmark, totalNumPvsArray, numPvsPerRequestArray, numThreadsArray);
     }
 
 }

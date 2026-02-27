@@ -1,5 +1,6 @@
 package com.ospreydcs.dp.service.ingest.benchmark;
 
+import com.ospreydcs.dp.grpc.v1.common.DataFrame;
 import com.ospreydcs.dp.grpc.v1.common.ExceptionalResult;
 import com.ospreydcs.dp.grpc.v1.ingestion.DpIngestionServiceGrpc;
 import com.ospreydcs.dp.grpc.v1.ingestion.IngestDataRequest;
@@ -20,7 +21,7 @@ public class BenchmarkIngestDataStream extends IngestionBenchmarkBase {
 
         public UniStreamingIngestionTask(
                 IngestionTaskParams params,
-                IngestDataRequest.IngestionDataFrame.Builder templateDataFrameBuilder,
+                DataFrame.Builder templateDataFrameBuilder,
                 Channel channel
         ) {
             super(params, templateDataFrameBuilder, channel);
@@ -38,7 +39,7 @@ public class BenchmarkIngestDataStream extends IngestionBenchmarkBase {
 
         private IngestionTaskResult sendUniStreamingIngestionRequest(
                 IngestionTaskParams params,
-                IngestDataRequest.IngestionDataFrame.Builder templateDataTable,
+                DataFrame.Builder templateDataTable,
                 Channel channel
         ) {
             final int streamNumber = params.streamNumber;
@@ -130,14 +131,34 @@ public class BenchmarkIngestDataStream extends IngestionBenchmarkBase {
     }
 
     protected UniStreamingIngestionTask newIngestionTask(
-            IngestionTaskParams params, IngestDataRequest.IngestionDataFrame.Builder templateDataTable, Channel channel
+            IngestionTaskParams params, DataFrame.Builder templateDataTable, Channel channel
     ) {
         return new UniStreamingIngestionTask(params, templateDataTable, channel);
     }
 
     public static void main(final String[] args) {
         BenchmarkIngestDataStream benchmark = new BenchmarkIngestDataStream();
-        runBenchmark(benchmark, false);
+        
+        // Parse command line argument for column data type
+        ColumnDataType columnDataType = ColumnDataType.DATA_COLUMN; // Default to legacy DataColumn
+        
+        if (args.length > 0) {
+            switch (args[0].toLowerCase()) {
+                case "--double-column" -> columnDataType = ColumnDataType.DOUBLE_COLUMN;
+                case "--serialized-column" -> columnDataType = ColumnDataType.SERIALIZED_DATA_COLUMN;
+                case "--data-column" -> columnDataType = ColumnDataType.DATA_COLUMN;
+                default -> {
+                    System.err.println("Usage: BenchmarkIngestDataStream [--data-column|--double-column|--serialized-column]");
+                    System.err.println("  --data-column      Use legacy DataColumn/DataValue structure (default)");
+                    System.err.println("  --double-column    Use new efficient DoubleColumn structure");
+                    System.err.println("  --serialized-column Use SerializedDataColumn structure");
+                    System.exit(1);
+                }
+            }
+        }
+        
+        System.out.println("Running BenchmarkIngestDataStream with " + columnDataType);
+        runBenchmark(benchmark, columnDataType);
     }
 
 }

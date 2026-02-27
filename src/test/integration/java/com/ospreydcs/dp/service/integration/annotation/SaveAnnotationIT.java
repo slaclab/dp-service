@@ -1,7 +1,6 @@
 package com.ospreydcs.dp.service.integration.annotation;
 
 import com.ospreydcs.dp.service.annotation.AnnotationTestBase;
-import com.ospreydcs.dp.service.common.protobuf.EventMetadataUtility;
 import org.junit.*;
 
 import java.time.Instant;
@@ -106,13 +105,6 @@ public class SaveAnnotationIT extends AnnotationIntegrationTestIntermediate {
             final String comment = "This negative test case covers an annotation that specifies an invalid associated annotation id.";
             final List<String> tags = List.of("beam loss", "outage");
             final Map<String, String> attributeMap = Map.of("sector", "01", "subsystem", "vacuum");
-            final EventMetadataUtility.EventMetadataParams eventMetadataParams =
-                    new EventMetadataUtility.EventMetadataParams(
-                            "experiment 1234",
-                            startSeconds,
-                            0L,
-                            startSeconds+60,
-                            999_000_000L);
 
             AnnotationTestBase.SaveAnnotationRequestParams params =
                     new AnnotationTestBase.SaveAnnotationRequestParams(
@@ -123,7 +115,7 @@ public class SaveAnnotationIT extends AnnotationIntegrationTestIntermediate {
                             comment,
                             tags,
                             attributeMap,
-                            eventMetadataParams, null);
+                            null);
 
             final boolean expectReject = true;
             final String expectedRejectMessage = "no AnnotationDocument found with id: junk12345";
