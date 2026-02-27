@@ -263,29 +263,26 @@ For the Query and Annotation Services, where performance is important but not on
 The handler for each service implementation including "MongoAnnotationHandler" provides factory methods such as "newMongoSyncAnnotationHandler()" to create a handler instance initialized with the synchronous database client "MongoSyncIngestionClient".  When new jobs are added to the handler's task queue, they are provided with a reference to the database client for accessing database operations by both the job and its dispatcher, as needed.  This is illustrated in the diagram by "QueryAnnotationsJob" and the corresponding "AnnotationsResponseDispatcher" which call the database client methods "executeQueryAnnotations()" and "findDataSet()" in the execution of their methods "execute()" and "handleResult()", respectively.
 
 
-### serialization of protobuf objects to MongoDB documents
+### storing PV time-series data in MongoDB documents
 
-The Ingestion Service adds a document to the MongoDB "buckets" collection for each "DataColumn" (vector of samples) contained in an ingestion request's data frame.  The documents contain the vector's "DataValues" and the corresponding "DataTimestamps" for those values, as well as other details such as bucket start and end time.
+The Ingestion Service adds a document to the MongoDB "buckets" collection for each heterogeneous column data message (vector of samples) contained in an ingestion request's data frame.  The documents contain two embedded documents, one containing the vector of column data values and the other with the corresponding "DataTimestamps" for those values, as well as other details such as bucket start and end time.
 
-Originally, the Ingestion Service used a polymorphic hierarchy of parameterized classes derived from the base class, "BucketDocument" to handle the various data types supported by the API "DataValue" message.  This approach required a Java "POJO" class for each supported API "DataValue" type for mapping the API type to a Java type.  For example, the Java class "DoubleBucketDocument" extends the base "BucketDocument" class with the type parameter "Double" to handle the API DataValue value type "doubleValue", and the Java class "StringBucketDocument" with parameter type "String" handles the API DataValue value type "stringValue".
+The embedded column documents come from a polymorphic hierarchy of classes rooted by ColumnDocumentBase, with intermediate base classes like ScalarColumnDocumentBase, ArrayColummnDocumentBase, and BinaryColumnDocumentBase.  It includes concrete classes that correspond to each of the protobuf column message data types.  E.g., the protobuf message DoubleColumn is handled by the document class DoubleColumnDocument.
 
-While this approach is fairly straightforward for the basic scalar data types defined by the API that map to primitive Java types, it encounters problems handling more complex API data types like "Array" and "Structure" which can contain nested references to other "DataValue" types.  It would be challenging to design Java BucketDocument subclasses to handle arbitrarily nested arrays of structures that might contain arrays of different data types, etc.
+The vector of sample values contained in the documents for the scalar column data types (those derived from ScalarColumnDocumentBase) is transparent in the database, and therefore supports indexing and query-by-value.  The documents for the more complex column data types use binary storage for the vector of data values, thus extending the intermediate base class BinaryColumnDocumentBase.
 
-In order to support these more complex API data types, we changed approach in version 1.4 to serialize the protobuf "DataColumn" object directly to the "BucketDocument" as an opaque byte array field without otherwise unpacking the column's "DataValues".  This allows us to support all API data types (including arbitrarily nested arrays and structures) while eliminating the need for the hierarchy of classes derived from "BucketDocument" for handling each unique API data type.
+```
+TODO: update the UML diagram for BucketDocument and embedded column document hierarchy
 
-In addition to simplifying the code base, this change improved ingestion performance significantly and reduced the MongoDB storage footprint (due to the compression used in protobuf serialization).
-
-We decided to use the same approach for storing "DataTimestamps", which can contain either a "SamplingClock" (specifying the start time, number of samples, and sample period) or "TimestampsList" (with an explicit list of data timestamps), in the "BucketDocuments".  Instead of unpacking the "DataTimestamps" from the ingestion request and adding conditional fields to "BucketDocument" to store the constituent "SamplingClock" or "TimestampsList", we simply serialize the "DataTimestamps" protobuf object to the "BucketDocument" as an opaque byte array field.
-
-The class diagram below shows part of the original polymorphic "BucketDocument" hierarchy.  The base class uses the type parameter "T" to indicate the type of data managed by the class.  It also includes the "@BsonDiscriminator" annotation to specify that MongoDB should use the value of the "dataType" field to determine which Java POJO class to use for each document.  The derived class "DoubleBucketDocument" uses the type parameter "Double" to show that the bucket contains Java Double data values.  Similarly, the "StringBucketDocument" derived class manages "String" data values.
-
-The diagram also shows that the base class uses fields to capture the details for the bucket's "DataTimestamps", with fields for both "SamplingClock" and "TimestampsList" details.
+The original polymorphic BucketDocument hierarchy defined subclasses for the various heterogeneous data types supported by DataValue, but that approach wasn't feasible for more complex data types like unbounded arrays, structures that could contain other complex data types, etc.  That hierarchy is shown below. 
 
 ![bucket document hierarchy](images/uml-dp-bucket-document-hierarchy.png "bucket document hierarchy")
 
 In Data Platform version 1.4, the polymorphic "BucketDocument" hierarchy shown above is replaced by the new standalone "BucketDocument" class shown in the class diagram below.  It contains byte array fields "dataColumnBytes" and "dataTimestampsBytes" to hold the serialized "DataColumn" and "DataTimestamps" for the bucket, respectively.  It provides methods for reading and writing the serialized object to the bucket, and getting the API type case and name for the serialized object.
 
 ![bucket document standalone](images/uml-dp-bucket-document-standalone.png "bucket document standalone")
+```
+
 
 ### data subscription framework
 
@@ -304,6 +301,7 @@ The new SourceMonitor instance is passed by SubscribeDataRequestObserver to Mong
 The only change to data ingestion handling is in the method IngestDataJob.handleIngestionRequest(), the method responsible for persisting ingested data to MongoDB.  After saving data to the database, the method calls DataSubscriptionManager.publishDataSubscription() with the ingestion request.  That subscription manager method iterates through the DataColumns in the ingestion request, and publishes data for each column where there are subscriptions for the column's PV.  The subscription manager uses SourceMonitor.publishData() to send a response message in the API method's response stream.
 
 SourceMonitor.requestCancel() uses a concurrency mechanism to ensure that only a single request to cancel the subscription is processed.  It calls MongoIngestionHandler.removeSourceMonitor() to unregister the subscription, which dispatches to DataSubscriptionManager.removeSubscriptions() to remove subscription details for the specified SourceMonitor from the data structures for managing subscriptions.
+
 
 ### data event monitoring framework
 
@@ -330,6 +328,7 @@ The classes implementing this service are contained in the new ingestionstream p
   * If the data is for a target PV, the incoming data is buffered via the DataBufferManager.  Before flushing buffered data that has reached the maximum buffer age, the DataBufferManager calls EventMonitor.processBufferedData() which iterates through the list of active TriggeredEvents and dispatches the buffered data in the subscription's response stream if the timestamp for the buffered data falls within the TriggeredEvent's time interval.
 
 EventMonitorManager: Manages collection of EventMonitors, including ensuring that each EventMonitor is cleaned up and shutdown when the system is terminated.
+
 
 ### exporting data
 
@@ -390,6 +389,7 @@ _configMgr().getConfigInteger(CFG_KEY_NUM_WORKERS, DEFAULT_NUM_WORKERS)_
 
 where "configMgr()" is a convenience method for accessing the singleton "ConfigurationManager" instance.
 
+
 ### performance benchmarking
 
 Because performance is the most important requirement for the Data Platform Ingestion Service, we developed a benchmarking framework in parallel with the service implementation so that we could measure performance at each stage of development and compare different approaches (such as comparing the performance obtained with the MongoDB Java "sync" driver with the "reactivestreams" one).  The same pattern was followed to build a performance benchmark framework for the Query Service implementation.
@@ -397,6 +397,7 @@ Because performance is the most important requirement for the Data Platform Inge
 Both benchmark frameworks use the MongoDB database "dp-benchmark".  Before each run of any benchmark, the contents of that database are removed and new contents are added by the benchmark.
 
 Benchmark-specific servers, "BenchmarkIngestionGrpcServer" and "BenchmarkQueryGrpcServer", were added that override the standard Ingestion and Query service network ports for those services to avoid adding benchmark data to a live production database.
+
 
 #### ingestion service performance benchmarking
 
@@ -431,6 +432,7 @@ Various concrete performance benchmark application classes extend the base class
 
 For example, the benchmark application class "BenchmarkQueryDataStream" shown in the diagram above defines the task class "QueryResponseStreamTask" that extends "QueryDataResponseTask".  Each task calls the "queryDataStream()" API and keeps track of the number of values and bytes sent for use in performance statistics.
 
+
 ### generating sample data
 
 Recognizing the previous use of the ingestion performance benchmark application for creating test data for web app development and demo, a new TestDataGenerator utility has been added.  A more fully featured simulator / generator is under development, but in the meantime this tool can be used to generate sample data for use in web application development or demo purposes.  Like the ingestion benchmark, it generates one minute's data for 4000 PVs sampled at 1 KHz.
@@ -438,6 +440,7 @@ Recognizing the previous use of the ingestion performance benchmark application 
 To use the sample data generator, the standard ingestion service should be running ("IngestionGrpcServer").  This captures data to the standard "dp" database instead of the benchmark-specific "dp-benchmark" database.
 
 The dp-support repo contains a wrapper script in the bin directory for running the sample data generator, "app-run-test-data-generator".
+
 
 ### regression testing
 
@@ -450,6 +453,7 @@ After adding coverage for both the Ingestion and Query service implementations, 
 Since the integration testing framework was added, we've preferred adding test coverage at that level when possible because it exercises the communication framework in addition to the service implementations.  For that reason, there is less low-level test coverage of the annotation service implementation than the other service, but pretty good coverage at the higher-level integration test level.  We will add more extensive low-level coverage for all the services as time goes on to cover more special / unusual cases.
 
 We've used a naming convention for classes that contain jUnit test cases to end the class name with "Test".  The names of base classes that are intended to be extended by concrete test classes end with "Base".
+
 
 ### integration testing
 
