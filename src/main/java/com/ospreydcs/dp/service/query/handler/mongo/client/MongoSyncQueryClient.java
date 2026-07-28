@@ -31,6 +31,11 @@ public class MongoSyncQueryClient extends MongoSyncClient implements MongoQueryC
 
     private static final Logger logger = LogManager.getLogger();
 
+    // Upper bound on bucket duration. Buckets are one-per-ingestion-request (typically 1 s),
+    // but no hard limit is enforced. 3600 s is a safe conservative ceiling: any bucket whose
+    // firstTime < (startTime - 3600) cannot overlap the query window, so it is safe to exclude.
+    private static final long MAX_BUCKET_DURATION_SECS = 3600L;
+
     public MongoCursor<BucketDocument> executeBucketDocumentQuery(
             Bson columnNameFilter,
             long startTimeSeconds,
@@ -38,15 +43,19 @@ public class MongoSyncQueryClient extends MongoSyncClient implements MongoQueryC
             long endTimeSeconds,
             long endTimeNanos
     ) {
-        final Bson endTimeFilter =
+        // firstTime range: [startTimeSeconds - MAX_BUCKET_DURATION_SECS, endTime) (nanos-precise)
+        // Lower bound: any bucket starting before (startTime - MAX_BUCKET_DURATION_SECS) cannot
+        // overlap the query window, so it is safe to exclude.
+        final Bson firstTimeRange = and(
+                gte(BsonConstants.BSON_KEY_BUCKET_FIRST_TIME_SECS, startTimeSeconds - MAX_BUCKET_DURATION_SECS),
                 or(lt(BsonConstants.BSON_KEY_BUCKET_FIRST_TIME_SECS, endTimeSeconds),
                         and(eq(BsonConstants.BSON_KEY_BUCKET_FIRST_TIME_SECS, endTimeSeconds),
-                                lt(BsonConstants.BSON_KEY_BUCKET_FIRST_TIME_NANOS, endTimeNanos)));
+                                lt(BsonConstants.BSON_KEY_BUCKET_FIRST_TIME_NANOS, endTimeNanos))));
         final Bson startTimeFilter =
                 or(gt(BsonConstants.BSON_KEY_BUCKET_LAST_TIME_SECS, startTimeSeconds),
                         and(eq(BsonConstants.BSON_KEY_BUCKET_LAST_TIME_SECS, startTimeSeconds),
                                 gte(BsonConstants.BSON_KEY_BUCKET_LAST_TIME_NANOS, startTimeNanos)));
-        final Bson filter = and(columnNameFilter, endTimeFilter, startTimeFilter);
+        final Bson filter = and(columnNameFilter, firstTimeRange, startTimeFilter);
 
         logger.debug("executing query columns: " + columnNameFilter
                 + " startSeconds: " + startTimeSeconds
