@@ -44,7 +44,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag != '' && inputs.image_tag || (github.ref_type == 'tag' && github.ref_name) || (inputs.tag != '' && inputs.tag) || github.sha }}
     steps:
       - name: Checkout repository at tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           # On push: github.ref already points to the tag; on manual: checkout refs/tags/<input>
@@ -53,14 +53,14 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref != '' && inputs.ref || (inputs.tag != '' && format('refs/tags/{0}', inputs.tag))) || github.ref }}
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'maven'
 
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         id: docker-cache
         with:
           path: /tmp/.buildx-cache
@@ -69,7 +69,7 @@ jobs:
             ${{ runner.os }}-buildx-
 
       - name: Checkout dp-grpc dependency
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: 'osprey-dcs/dp-grpc'
           path: dp-grpc
@@ -136,7 +136,7 @@ jobs:
 
       - name: Log in to GitHub Container Registry
         if: success()
-        uses: docker/login-action@v2
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -144,7 +144,7 @@ jobs:
 
       - name: Build and push Docker image
         if: success()
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./Dockerfile
