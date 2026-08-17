@@ -16,9 +16,9 @@ on:
         required: false
         default: ''
       dp_grpc_ref:
-        description: 'dp-grpc git ref (branch, tag, or commit) used during build'
+        description: 'dp-grpc git ref (branch, tag, or commit) used during build (defaults to the tag being built, else main)'
         required: false
-        default: 'main'
+        default: ''
       image_tag:
         description: 'Image tag to push (defaults to the git tag or commit SHA if no tag provided)'
         required: false
@@ -34,8 +34,9 @@ jobs:
     env:
       JAVA_VERSION: '21'
       DP_GRPC_REPO: 'https://github.com/osprey-dcs/dp-grpc.git'
-      # Use provided dp_grpc_ref when set, otherwise default to 'main'
-      DP_GRPC_REF: ${{ inputs.dp_grpc_ref != '' && inputs.dp_grpc_ref || 'main' }}
+      # dp-grpc is released with the same rel-x.y.z tag as this project, so track the tag being built;
+      # 'main' (not github.sha) is the fallback since a dp-service commit has no meaning in dp-grpc
+      DP_GRPC_REF: ${{ inputs.dp_grpc_ref != '' && inputs.dp_grpc_ref || (github.ref_type == 'tag' && github.ref_name) || (inputs.tag != '' && inputs.tag) || 'main' }}
       # IMAGE_TAG resolution priority:
       # 1) explicit inputs.image_tag (manual override)
       # 2) if workflow is triggered on a tag, use the tag name
@@ -80,6 +81,17 @@ jobs:
         working-directory: dp-grpc
         run: |
           mvn -B -DskipTests install
+
+      # Otherwise a version mismatch only surfaces as an unresolved dependency inside the Docker build
+      - name: Verify dp-grpc version matches pom requirement
+        run: |
+          WANT=$(sed -n 's:.*<dp-grpc.version>\(.*\)</dp-grpc.version>.*:\1:p' pom.xml)
+          GOT=$(mvn -f dp-grpc/pom.xml -B -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "pom.xml requires dp-grpc ${WANT}; ref '${DP_GRPC_REF}' provides ${GOT}"
+          if [ "$WANT" != "$GOT" ]; then
+            echo "ERROR: dp-grpc version mismatch - build dp-grpc from a ref that provides ${WANT} (e.g. rel-${WANT}) or set the dp_grpc_ref input." >&2
+            exit 1
+          fi
 
       - name: Diagnostic - show workspace and repo state
         run: |

@@ -53,6 +53,17 @@ jobs:
         run: |
           mvn -B -DskipTests install
 
+      # Otherwise a version mismatch only surfaces later as an unresolved dependency
+      - name: Verify dp-grpc version matches pom requirement
+        run: |
+          WANT=$(sed -n 's:.*<dp-grpc.version>\(.*\)</dp-grpc.version>.*:\1:p' pom.xml)
+          GOT=$(mvn -f dp-grpc/pom.xml -B -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "pom.xml requires dp-grpc ${WANT}; ref '${DP_GRPC_REF}' provides ${GOT}"
+          if [ "$WANT" != "$GOT" ]; then
+            echo "ERROR: dp-grpc version mismatch - update dp-grpc.version in pom.xml or point DP_GRPC_REF at a ref providing ${WANT}." >&2
+            exit 1
+          fi
+
       - name: Start MongoDB with Docker Compose
         run: |
           # start the needed backends to execute the tests
