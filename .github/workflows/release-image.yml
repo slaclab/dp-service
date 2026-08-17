@@ -34,9 +34,7 @@ jobs:
     env:
       JAVA_VERSION: '21'
       DP_GRPC_REPO: 'https://github.com/osprey-dcs/dp-grpc.git'
-      # dp-grpc is released with the same rel-x.y.z tag as this project, so track the tag being built;
-      # 'main' (not github.sha) is the fallback since a dp-service commit has no meaning in dp-grpc
-      DP_GRPC_REF: ${{ inputs.dp_grpc_ref != '' && inputs.dp_grpc_ref || (github.ref_type == 'tag' && github.ref_name) || (inputs.tag != '' && inputs.tag) || 'main' }}
+      # DP_GRPC_REF is resolved at runtime by the "Resolve dp-grpc ref" step
       # IMAGE_TAG resolution priority:
       # 1) explicit inputs.image_tag (manual override)
       # 2) if workflow is triggered on a tag, use the tag name
@@ -59,6 +57,26 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'maven'
+
+      # dp-grpc shares this project's rel-x.y.z tag scheme, but a dp-service patch release may have no
+      # matching dp-grpc tag, so fall back to the version the pom actually requires
+      - name: Resolve dp-grpc ref
+        env:
+          CANDIDATE: ${{ inputs.dp_grpc_ref != '' && inputs.dp_grpc_ref || (github.ref_type == 'tag' && github.ref_name) || inputs.tag }}
+        run: |
+          WANT=$(sed -n 's:.*<dp-grpc.version>\(.*\)</dp-grpc.version>.*:\1:p' pom.xml)
+          if [ -n "$CANDIDATE" ] && git ls-remote --exit-code "$DP_GRPC_REPO" "refs/tags/$CANDIDATE" "refs/heads/$CANDIDATE" >/dev/null 2>&1; then
+            REF="$CANDIDATE"
+          elif [ -n "${{ inputs.dp_grpc_ref }}" ]; then
+            echo "ERROR: requested dp_grpc_ref '$CANDIDATE' does not exist in $DP_GRPC_REPO" >&2
+            exit 1
+          elif git ls-remote --exit-code "$DP_GRPC_REPO" "refs/tags/rel-$WANT" >/dev/null 2>&1; then
+            REF="rel-$WANT"
+          else
+            REF="main"
+          fi
+          echo "dp-grpc ref: $REF (candidate '$CANDIDATE', pom requires $WANT)"
+          echo "DP_GRPC_REF=$REF" >> "$GITHUB_ENV"
 
       - name: Cache Docker layers
         uses: actions/cache@v4
