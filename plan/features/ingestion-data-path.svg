@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 960" width="1100" height="960" role="img" aria-label="Ingestion data path: receive stage, ingest log, writer double buffer, Arrow IPC hot cache, Parquet, query path">
+<style>
+:root{--bg:#f6f7f9;--panel:#ffffff;--fg:#1b2430;--muted:#5b6676;--line:#c7cfda;
+--hot:#d9480f;--warm:#e8890c;--tepid:#2b8a9e;--cold:#3b5bdb;--ok:#2f9e44;
+--hot-bg:#fff1e8;--warm-bg:#fff6e0;--tepid-bg:#e6f5f7;--cold-bg:#ecf0ff;--q-bg:#eef7ee}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--panel:#1a2029;--fg:#e4e9f0;--muted:#98a3b3;--line:#3a4555;
+--hot:#ff8a4c;--warm:#f6b44a;--tepid:#5cc6d8;--cold:#8ea4ff;--ok:#69d17e;
+--hot-bg:#3a2216;--warm-bg:#352a14;--tepid-bg:#14313a;--cold-bg:#1d2547;--q-bg:#183020}}
+text{font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+.m{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;fill:var(--muted)}
+.t{font-weight:600;font-size:13px}.s{font-size:11.5px;fill:var(--muted)}
+.n{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;font-size:11px}
+.h{font-weight:600;font-size:16px}
+</style>
+<rect width="1100" height="960" fill="var(--bg)"/>
+<text x="20" y="22" class="h">Ingestion data path: sample received → hot cache → Parquet</text>
+<rect x="20" y="34" width="12" height="12" rx="3" fill="var(--hot)"/><text x="38" y="45" class="s">RAM, active buffer</text><rect x="173.39999999999998" y="34" width="12" height="12" rx="3" fill="var(--warm)"/><text x="191.39999999999998" y="45" class="s">RAM, sealed buffer</text><rect x="326.79999999999995" y="34" width="12" height="12" rx="3" fill="var(--tepid)"/><text x="344.79999999999995" y="45" class="s">Arrow IPC on local FS (hot cache)</text><rect x="574.6999999999999" y="34" width="12" height="12" rx="3" fill="var(--cold)"/><text x="592.6999999999999" y="45" class="s">Parquet + manifest (cold)</text><rect x="772.1999999999999" y="34" width="12" height="12" rx="3" fill="var(--ok)"/><text x="790.1999999999999" y="45" class="s">query path</text>
+<g transform="translate(0,60)">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--ok)"/></marker>
+  </defs>
+
+  <!-- column 1: client + receive stage -->
+  <rect x="10" y="30" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="24" y="54" class="t">Clients</text>
+  <text x="24" y="74" class="s">Sample: ts, pvName,</text>
+  <text x="24" y="90" class="s">value, K/V attributes</text>
+  <text x="24" y="108" class="m">or batch blocks</text>
+
+  <rect x="10" y="160" width="170" height="130" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="24" y="184" class="t">Receive stage (any node)</text>
+  <text x="24" y="204" class="s">1 validate</text>
+  <text x="24" y="221" class="s">2 split into per-PV blocks</text>
+  <text x="24" y="238" class="s">3 hash(pv) mod P</text>
+  <text x="24" y="255" class="s">4 coalesce ≈1 MB Arrow</text>
+  <text x="24" y="272" class="s">5 publish, wait PubAck</text>
+  <line x1="95" y1="122" x2="95" y2="158" stroke="var(--muted)" marker-end="url(#a)"/>
+  <text x="102" y="145" class="m">gRPC stream</text>
+  <path d="M60,290 L60,330 L60,158" fill="none"/>
+  <text x="18" y="310" class="m">ack ← after PubAck</text>
+
+  <!-- column 2: JetStream -->
+  <rect x="215" y="160" width="170" height="130" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="229" y="184" class="t">Ingest log</text>
+  <text x="229" y="204" class="s">JetStream R3 or local WAL</text>
+  <text x="229" y="221" class="m">dp.ingest.p.&lt;k&gt;</text>
+  <text x="229" y="240" class="s">ordered per partition</text>
+  <text x="229" y="257" class="s">stream seq = WAL seq</text>
+  <text x="229" y="274" class="s">retained until acked</text>
+  <line x1="180" y1="225" x2="213" y2="225" stroke="var(--muted)" marker-end="url(#a)"/>
+
+  <!-- writer frame -->
+  <rect x="415" y="14" width="675" height="390" rx="10" fill="none" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text x="430" y="36" class="t">Writer stage: lease owner of partition k (epoch e)</text>
+  <line x1="385" y1="225" x2="433" y2="225" stroke="var(--muted)" marker-end="url(#a)"/>
+  <text x="388" y="214" class="m">pull</text>
+
+  <!-- double buffer -->
+  <text x="435" y="66" class="n" fill="var(--hot)" style="fill:var(--hot)">T0 · RAM · double buffer</text>
+  <rect x="435" y="76" width="200" height="96" rx="8" fill="var(--hot-bg)" stroke="var(--hot)" stroke-width="1.5"/>
+  <text x="449" y="98" class="t">Buffer A · active</text>
+  <text x="449" y="116" class="s">per-PV Arrow builders</text>
+  <text x="449" y="133" class="s">appends, seq range [lo, …]</text>
+  <text x="449" y="152" class="m">seal at 64 MB or 10 s</text>
+
+  <rect x="435" y="196" width="200" height="96" rx="8" fill="var(--warm-bg)" stroke="var(--warm)" stroke-width="1.5"/>
+  <text x="449" y="218" class="t">Buffer B · sealed</text>
+  <text x="449" y="236" class="s">immutable, sort by (pv, ts)</text>
+  <text x="449" y="253" class="s">still queryable</text>
+  <text x="449" y="272" class="m">freed after IPC is durable</text>
+
+  <path d="M650,124 C690,124 690,244 650,244" fill="none" stroke="var(--muted)" marker-end="url(#a)"/>
+  <text x="664" y="190" class="m">swap</text>
+  <text x="440" y="316" class="s">Only one buffer takes appends at a time.</text>
+  <text x="440" y="332" class="s">When B is still being written, A blocks or grows</text>
+  <text x="440" y="348" class="s">and JetStream pull pauses: back-pressure, no loss.</text>
+
+  <!-- IPC hot cache -->
+  <text x="725" y="66" class="n" style="fill:var(--tepid)">T1 · local FS · hot cache</text>
+  <rect x="725" y="76" width="350" height="216" rx="8" fill="var(--tepid-bg)" stroke="var(--tepid)" stroke-width="1.5"/>
+  <text x="739" y="98" class="t">Arrow IPC segments (mmap)</text>
+  <g>
+    <rect x="739" y="112" width="70" height="44" rx="4" fill="var(--panel)" stroke="var(--tepid)"/>
+    <text x="746" y="131" class="m">seg 41</text><text x="746" y="147" class="m">10:00:00</text>
+    <rect x="817" y="112" width="70" height="44" rx="4" fill="var(--panel)" stroke="var(--tepid)"/>
+    <text x="824" y="131" class="m">seg 42</text><text x="824" y="147" class="m">10:00:10</text>
+    <rect x="895" y="112" width="70" height="44" rx="4" fill="var(--panel)" stroke="var(--tepid)"/>
+    <text x="902" y="131" class="m">seg 43</text><text x="902" y="147" class="m">10:00:20</text>
+    <rect x="973" y="112" width="88" height="44" rx="4" fill="var(--panel)" stroke="var(--tepid)" stroke-dasharray="3 3"/>
+    <text x="980" y="131" class="m">seg 44 …</text><text x="980" y="147" class="m">writing</text>
+  </g>
+  <text x="739" y="178" class="s">write tmp → fsync → rename → fsync dir</text>
+  <text x="739" y="195" class="s">each segment: seq [lo,hi], tMin/tMax, PV list</text>
+  <text x="739" y="212" class="s">local index: segments by time window</text>
+  <text x="739" y="232" class="s">retained for the hot window (e.g. 1 h)</text>
+  <text x="739" y="249" class="s">rebuildable from JetStream on loss</text>
+  <text x="739" y="272" class="m">JetStream ack ≤ hi only after Parquet commit</text>
+  <line x1="635" y1="244" x2="723" y2="190" stroke="var(--muted)" marker-end="url(#a)"/>
+  <text x="652" y="282" class="m">write IPC</text>
+
+  <!-- flush to parquet -->
+  <rect x="725" y="314" width="350" height="78" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="739" y="336" class="t">Flusher (per hot window)</text>
+  <text x="739" y="354" class="s">merge window's IPC segments → one Parquet</text>
+  <text x="739" y="371" class="s">sorted (pv, ts), row groups per PV</text>
+  <text x="739" y="386" class="m">large files: no small-file problem</text>
+  <line x1="900" y1="292" x2="900" y2="312" stroke="var(--muted)" marker-end="url(#a)"/>
+
+  <!-- parquet + manifest -->
+  <text x="725" y="432" class="n" style="fill:var(--cold)">T2 · object store / NFS · cold</text>
+  <rect x="725" y="442" width="170" height="92" rx="8" fill="var(--cold-bg)" stroke="var(--cold)" stroke-width="1.5"/>
+  <text x="739" y="464" class="t">Parquet files</text>
+  <text x="739" y="482" class="s">immutable, ULID name</text>
+  <text x="739" y="499" class="s">compacted later</text>
+  <text x="739" y="518" class="m">crc32c in manifest</text>
+
+  <rect x="905" y="442" width="170" height="92" rx="8" fill="var(--cold-bg)" stroke="var(--cold)" stroke-width="1.5"/>
+  <text x="919" y="464" class="t">Manifest (Mongo)</text>
+  <text x="919" y="482" class="s">CAS: version, epoch</text>
+  <text x="919" y="499" class="s">committedSeq = hi</text>
+  <text x="919" y="518" class="m">+ pvStats before commit</text>
+  <line x1="810" y1="392" x2="810" y2="440" stroke="var(--muted)" marker-end="url(#a)"/>
+  <line x1="990" y1="392" x2="990" y2="440" stroke="var(--muted)" marker-end="url(#a)"/>
+  <text x="996" y="420" class="m">commit CAS</text>
+
+  <!-- release step -->
+  <rect x="435" y="442" width="260" height="92" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="449" y="464" class="t">Release after commit</text>
+  <text x="449" y="482" class="s">1 ack JetStream ≤ committedSeq</text>
+  <text x="449" y="499" class="s">2 mark IPC segments obsolete</text>
+  <text x="449" y="516" class="s">3 delete when no query snapshot uses them</text>
+  <line x1="903" y1="500" x2="697" y2="500" stroke="var(--muted)" marker-end="url(#a)"/>
+
+  <!-- query -->
+  <rect x="10" y="420" width="390" height="190" rx="8" fill="var(--q-bg)" stroke="var(--ok)" stroke-width="1.5"/>
+  <text x="24" y="444" class="t">Query (querySamples / queryBuckets)</text>
+  <text x="24" y="466" class="s">1 read manifest snapshot: files, C = committedSeq</text>
+  <text x="24" y="484" class="s">2 cold: Parquet files overlapping [begin, end)</text>
+  <text x="24" y="502" class="s">3 hot: IPC segments + buffers B and A, rows seq &gt; C</text>
+  <text x="24" y="520" class="s">4 merge by (pv, ts), each sample exactly once</text>
+  <text x="24" y="538" class="s">5 pin segments with a refcount for the query's life</text>
+  <text x="24" y="562" class="m">hot reads are routed to the partition owner</text>
+  <text x="24" y="578" class="m">(lease table says which writer holds partition k)</text>
+  <text x="24" y="596" class="m">recent window only touches T0/T1, never Parquet</text>
+  <path d="M400,470 C420,470 420,124 433,124" fill="none" stroke="var(--ok)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+  <path d="M400,490 C460,490 470,190 723,180" fill="none" stroke="var(--ok)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+  <path d="M400,590 C600,600 700,560 723,520" fill="none" stroke="var(--ok)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+</g>
+<text x="20" y="712" class="h">Lifecycle of one sample</text>
+<g transform="translate(0,720)">
+  <line x1="40" y1="110" x2="1070" y2="110" stroke="var(--line)" stroke-width="2"/>
+  <rect x="40" y="96" width="90" height="28" rx="4" fill="var(--hot)" opacity=".85"/>
+  <rect x="130" y="96" width="70" height="28" rx="4" fill="var(--warm)" opacity=".85"/>
+  <rect x="200" y="96" width="640" height="28" rx="4" fill="var(--tepid)" opacity=".85"/>
+  <rect x="840" y="96" width="230" height="28" rx="4" fill="var(--cold)" opacity=".85"/>
+  <rect x="740" y="96" width="100" height="28" rx="0" fill="var(--cold)" opacity=".35"/>
+  <g class="m">
+    <text x="40" y="150" class="m">t0 received</text>
+    <text x="40" y="166" class="m">PubAck → client ack</text>
+    <text x="130" y="84" class="m">≤10 s seal</text>
+    <text x="200" y="150" class="m">IPC durable, B freed</text>
+    <text x="420" y="84" class="m">hot window, e.g. 1 h: served from IPC</text>
+    <text x="740" y="150" class="m">flush + commit CAS</text>
+    <text x="740" y="166" class="m">IPC and Parquet overlap</text>
+    <text x="840" y="84" class="m">grace → IPC deleted</text>
+    <text x="905" y="150" class="m">Parquet only, compaction</text>
+  </g>
+  <text x="44" y="44" class="s">Durability at every moment: before commit the sample lives in JetStream (replicated) and in RAM/IPC; after commit, in Parquet.</text>
+  <text x="44" y="62" class="s">The local IPC copy is a performance cache, not the source of truth, so a lost disk only costs a JetStream replay.</text>
+</g>
+</svg>

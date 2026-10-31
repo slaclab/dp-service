@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 860" width="1180" height="860" role="img" aria-label="Cluster topology: clients, nodes with ingestion (receive and writer stages) and query roles, ingest log, MongoDB cluster state, shared storage">
+<style>
+:root{--bg:#f6f7f9;--panel:#ffffff;--fg:#1b2430;--muted:#5b6676;--line:#c7cfda;
+--gw:#2b8a9e;--gw-bg:#e6f5f7;--wr:#d9480f;--wr-bg:#fff1e8;--qe:#2f9e44;--qe-bg:#eef7ee;
+--db:#7048e8;--db-bg:#f1edff;--st:#3b5bdb;--st-bg:#ecf0ff;--log:#e8890c;--log-bg:#fff6e0}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--panel:#1a2029;--fg:#e4e9f0;--muted:#98a3b3;--line:#3a4555;
+--gw:#5cc6d8;--gw-bg:#14313a;--wr:#ff8a4c;--wr-bg:#3a2216;--qe:#69d17e;--qe-bg:#183020;
+--db:#b197fc;--db-bg:#2a2148;--st:#8ea4ff;--st-bg:#1d2547;--log:#f6b44a;--log-bg:#352a14}}
+text{font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+.h{font-weight:600;font-size:17px}.t{font-weight:600;font-size:13px}.s{font-size:11.5px;fill:var(--muted)}
+.m{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;fill:var(--muted)}
+.lbl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;font-weight:600}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--qe)"/></marker>
+<marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--wr)"/></marker>
+</defs>
+<rect width="1180" height="860" fill="var(--bg)"/>
+<text x="20" y="28" class="h">Cluster topology: nodes, roles, and shared services</text>
+<text x="20" y="48" class="s">Three nodes of one binary, roles ingestion and query chosen by config. Node 3 runs only query, to show a split. Every node reads and writes the cluster state in MongoDB.</text>
+
+<!-- legend -->
+<g transform="translate(20,62)">
+<rect width="12" height="12" rx="3" fill="var(--gw)"/><text x="18" y="11" class="s">ingestion: receive stage</text>
+<rect x="168" width="12" height="12" rx="3" fill="var(--wr)"/><text x="186" y="11" class="s">ingestion: writer stage</text>
+<rect x="340" width="12" height="12" rx="3" fill="var(--qe)"/><text x="358" y="11" class="s">query</text>
+<rect x="410" width="12" height="12" rx="3" fill="var(--log)"/><text x="428" y="11" class="s">ingest log</text>
+<rect x="490" width="12" height="12" rx="3" fill="var(--db)"/><text x="508" y="11" class="s">cluster state (MongoDB)</text>
+<rect x="680" width="12" height="12" rx="3" fill="var(--st)"/><text x="698" y="11" class="s">shared file storage</text>
+<line x1="830" y1="6" x2="870" y2="6" stroke="var(--muted)" marker-end="url(#a)"/><text x="876" y="11" class="s">ingest</text>
+<line x1="930" y1="6" x2="970" y2="6" stroke="var(--qe)" stroke-dasharray="4 3" marker-end="url(#g)"/><text x="976" y="11" class="s">query</text>
+</g>
+
+<!-- clients -->
+<rect x="20" y="96" width="520" height="56" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+<text x="34" y="118" class="t">Ingest clients</text>
+<text x="34" y="138" class="s">IOCs, digitizers, backfill tools → ingestSamples (gRPC stream), any node</text>
+<rect x="640" y="96" width="520" height="56" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+<text x="654" y="118" class="t">Query clients</text>
+<text x="654" y="138" class="s">apps, ML jobs, notebooks → Arrow Flight / querySamples, any query node</text>
+
+<!-- load balancer -->
+<rect x="20" y="168" width="1140" height="28" rx="6" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="4 3"/>
+<text x="34" y="187" class="m">load balancer / DNS (optional): spreads client connections across nodes; no PV knowledge</text>
+
+<!-- NODE 1 -->
+<rect x="20" y="214" width="370" height="330" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+<text x="34" y="236" class="t">node-1</text><text x="96" y="236" class="m">roles: ingestion, query</text>
+<rect x="34" y="248" width="342" height="62" rx="6" fill="var(--gw-bg)" stroke="var(--gw)"/>
+<text x="46" y="268" class="t">Receive stage</text>
+<text x="46" y="285" class="s">validate · placement lookup · lane (ts &lt; now−H)</text>
+<text x="46" y="301" class="s">stamp write version · coalesce · append to log</text>
+<rect x="34" y="320" width="342" height="138" rx="6" fill="var(--wr-bg)" stroke="var(--wr)"/>
+<text x="46" y="340" class="t">Writer stage</text><text x="104" y="340" class="m">leases p-0001, p-0002, p-0007</text>
+<rect x="46" y="350" width="104" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)"/>
+<text x="54" y="367" class="lbl" style="fill:var(--wr)">p-0001</text>
+<text x="54" y="384" class="m">hot A/B (RAM)</text><text x="54" y="398" class="m">hot IPC</text><text x="54" y="412" class="m">late cache/day</text><text x="54" y="430" class="m">→ Parquet</text>
+<rect x="158" y="350" width="104" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)"/>
+<text x="166" y="367" class="lbl" style="fill:var(--wr)">p-0002</text>
+<text x="166" y="384" class="m">hot A/B (RAM)</text><text x="166" y="398" class="m">hot IPC</text><text x="166" y="412" class="m">late cache/day</text><text x="166" y="430" class="m">→ Parquet</text>
+<rect x="270" y="350" width="94" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)" stroke-dasharray="3 3"/>
+<text x="278" y="367" class="lbl" style="fill:var(--wr)">p-0007</text>
+<text x="278" y="384" class="m">open: takes</text><text x="278" y="398" class="m">new PVs</text>
+<rect x="34" y="468" width="342" height="62" rx="6" fill="var(--qe-bg)" stroke="var(--qe)"/>
+<text x="46" y="488" class="t">Query engine</text><text x="146" y="488" class="m">+ internal node service</text>
+<text x="46" y="505" class="s">plan per partition · read files · Flight to owners</text>
+<text x="46" y="521" class="s">merge by (pv, ts), highest ver wins · wide table</text>
+
+<!-- NODE 2 -->
+<rect x="405" y="214" width="370" height="330" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+<text x="419" y="236" class="t">node-2</text><text x="481" y="236" class="m">roles: ingestion, query</text>
+<rect x="419" y="248" width="342" height="62" rx="6" fill="var(--gw-bg)" stroke="var(--gw)"/>
+<text x="431" y="268" class="t">Receive stage</text>
+<text x="431" y="285" class="s">same code as node-1; any node can take any PV</text>
+<text x="431" y="301" class="s">routes to the PV's partition: local, log, or Forward</text>
+<rect x="419" y="320" width="342" height="138" rx="6" fill="var(--wr-bg)" stroke="var(--wr)"/>
+<text x="431" y="340" class="t">Writer stage</text><text x="489" y="340" class="m">leases p-0003, p-0004, p-0008</text>
+<rect x="431" y="350" width="104" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)"/>
+<text x="439" y="367" class="lbl" style="fill:var(--wr)">p-0003</text>
+<text x="439" y="384" class="m">hot A/B (RAM)</text><text x="439" y="398" class="m">hot IPC</text><text x="439" y="412" class="m">late cache/day</text><text x="439" y="430" class="m">→ Parquet</text>
+<rect x="543" y="350" width="104" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)"/>
+<text x="551" y="367" class="lbl" style="fill:var(--wr)">p-0004</text>
+<text x="551" y="384" class="m">hot A/B (RAM)</text><text x="551" y="398" class="m">hot IPC</text><text x="551" y="412" class="m">late cache/day</text><text x="551" y="430" class="m">→ Parquet</text>
+<rect x="655" y="350" width="94" height="96" rx="4" fill="var(--panel)" stroke="var(--wr)" stroke-dasharray="3 3"/>
+<text x="663" y="367" class="lbl" style="fill:var(--wr)">p-0008</text>
+<text x="663" y="384" class="m">open: takes</text><text x="663" y="398" class="m">new PVs</text>
+<rect x="419" y="468" width="342" height="62" rx="6" fill="var(--qe-bg)" stroke="var(--qe)"/>
+<text x="431" y="488" class="t">Query engine</text><text x="531" y="488" class="m">+ internal node service</text>
+<text x="431" y="505" class="s">any query node can plan any request</text>
+<text x="431" y="521" class="s">serves its own caches to other query nodes</text>
+
+<!-- NODE 3 query only -->
+<rect x="790" y="214" width="370" height="330" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+<text x="804" y="236" class="t">node-3</text><text x="866" y="236" class="m">roles: query</text>
+<rect x="804" y="248" width="342" height="210" rx="6" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
+<text x="816" y="272" class="s">no ingestion role: holds no partitions</text>
+<text x="816" y="290" class="s">and no cache. Added to scale reads only.</text>
+<text x="816" y="320" class="m">Adding an ingestion node instead:</text>
+<text x="816" y="338" class="m">1 register in clusterNodes</text>
+<text x="816" y="354" class="m">2 allocate new open partitions</text>
+<text x="816" y="370" class="m">3 lowest load → receives new PVs first</text>
+<text x="816" y="386" class="m">4 rebalancer moves old PVs gradually</text>
+<text x="816" y="410" class="m">Node crash: its leases expire (10 s),</text>
+<text x="816" y="426" class="m">others claim the partitions and replay</text>
+<text x="816" y="442" class="m">uncommitted rows from the ingest log.</text>
+<rect x="804" y="468" width="342" height="62" rx="6" fill="var(--qe-bg)" stroke="var(--qe)"/>
+<text x="816" y="488" class="t">Query engine</text>
+<text x="816" y="505" class="s">reads files from shared storage, cached rows</text>
+<text x="816" y="521" class="s">over Flight from node-1 and node-2</text>
+
+<!-- ingest log -->
+<rect x="20" y="564" width="755" height="70" rx="8" fill="var(--log-bg)" stroke="var(--log)" stroke-width="1.5"/>
+<text x="34" y="586" class="t">Ingest log</text><text x="112" y="586" class="m">IngestLog interface, mode by config</text>
+<text x="34" y="604" class="s">jetstream: NATS cluster R3, subjects dp.ingest.{p,h}.&lt;partition&gt;, owner pulls its partitions; payload Arrow IPC</text>
+<text x="34" y="621" class="s">local: WAL per partition and lane on the owner; receive stage sends Arrow IPC via Forward (Flight DoPut)</text>
+
+<!-- mongo -->
+<rect x="20" y="652" width="755" height="190" rx="8" fill="var(--db-bg)" stroke="var(--db)" stroke-width="1.5"/>
+<text x="34" y="674" class="t">MongoDB replica set: cluster state, read by every node</text>
+<g class="m">
+<text x="34" y="698" class="m">clusterNodes</text><text x="174" y="698" class="m">node id, roles, endpoints, heartbeat 2 s, load, ACTIVE/DRAINING</text>
+<text x="34" y="716" class="m">partitionLease</text><text x="174" y="716" class="m">p-NNNN → owner, epoch, expiresAt, cache summary (tMin/tMax, late days, PV filter)</text>
+<text x="34" y="734" class="m">partitionManifest</text><text x="174" y="734" class="m">p-NNNN → version, committedRanges, files with per-PV row-group index</text>
+<text x="34" y="752" class="m">pvMetadata</text><text x="174" y="752" class="m">PV catalog + placement {partition, version, history}</text>
+<text x="34" y="770" class="m">clusterConfig</text><text x="174" y="770" class="m">nextPartitionId, hot window H, caps</text>
+<text x="34" y="788" class="m">clusterLease</text><text x="174" y="788" class="m">rebalancer election</text>
+<text x="34" y="806" class="m">pvStats, annotations…</text><text x="174" y="806" class="m">unified domain collections</text>
+</g>
+<text x="34" y="830" class="s">Every coordination write is a single-document conditional update (lease claim, placement, manifest commit).</text>
+
+<!-- storage -->
+<rect x="790" y="564" width="370" height="278" rx="8" fill="var(--st-bg)" stroke="var(--st)" stroke-width="1.5"/>
+<text x="804" y="586" class="t">Shared file storage</text>
+<text x="804" y="604" class="s">object store or NFS, read by every query node</text>
+<text x="804" y="632" class="m">p-0001/2026-10-31/01JB….parquet</text>
+<text x="804" y="648" class="m">p-0001/2025-03-10/01JC….parquet  (late)</text>
+<text x="804" y="664" class="m">p-0003/2026-10-31/01JD….parquet</text>
+<text x="804" y="680" class="m">…</text>
+<text x="804" y="708" class="s">Written only by the partition's owner.</text>
+<text x="804" y="724" class="s">Immutable; visible only after the</text>
+<text x="804" y="740" class="s">manifest commit in MongoDB.</text>
+<text x="804" y="768" class="s">Row groups mix PVs, sorted by (pv, ts).</text>
+<text x="804" y="796" class="s">Survives any node loss, so a partition</text>
+<text x="804" y="812" class="s">moves to another owner without copying.</text>
+
+<!-- ingest arrows -->
+<line x1="200" y1="152" x2="200" y2="246" stroke="var(--muted)" marker-end="url(#a)"/>
+<line x1="590" y1="152" x2="590" y2="246" stroke="var(--muted)" marker-end="url(#a)"/>
+<path d="M376,280 C395,280 395,560 390,562" fill="none" stroke="var(--muted)" marker-end="url(#a)"/>
+<path d="M761,280 C780,280 780,560 700,562" fill="none" stroke="var(--muted)" marker-end="url(#a)"/>
+<text x="300" y="556" class="m">append</text>
+<path d="M120,564 L120,460" fill="none" stroke="var(--wr)" marker-end="url(#o)"/>
+<path d="M505,564 L505,460" fill="none" stroke="var(--wr)" marker-end="url(#o)"/>
+<text x="126" y="556" class="m" style="fill:var(--wr)">pull own partitions</text>
+<!-- flush to storage -->
+<path d="M376,400 C800,400 820,500 900,562" fill="none" stroke="var(--wr)" stroke-dasharray="2 3" marker-end="url(#o)"/>
+<text x="790" y="556" class="m" style="fill:var(--wr)">flush Parquet</text>
+
+<!-- query arrows -->
+<line x1="975" y1="152" x2="975" y2="466" stroke="var(--qe)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+<path d="M804,500 C700,520 400,520 376,400" fill="none" stroke="var(--qe)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+<path d="M804,510 C780,505 780,420 761,400" fill="none" stroke="var(--qe)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+<text x="560" y="546" class="m" style="fill:var(--qe)">ReadCached (Flight): cached rows</text>
+<line x1="1100" y1="530" x2="1100" y2="562" stroke="var(--qe)" stroke-dasharray="4 3" marker-end="url(#g)"/>
+<text x="1040" y="552" class="m" style="fill:var(--qe)">read files</text>
+</svg>
