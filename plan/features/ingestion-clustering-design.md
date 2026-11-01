@@ -175,7 +175,8 @@ Properties:
 
 - **No frame, no bucket.** A block holds samples of one source; a request holds any number of blocks. Bucket size, span, file layout,
   partitioning, and flush cadence are server decisions and may change without a client release.
-  `maxBucketSpanSeconds` stops being a client-visible limit; the writer cuts buckets itself.
+  `maxBucketSpanSeconds` stops being a client-visible limit; the writer decides file and row-group
+  boundaries itself.
 - **Batching stays possible** for efficiency: a message carries many samples of one source, and a
   stream multiplexes sources. A thin client library can still accept a multi-PV frame and split it
   per source, so existing client code can migrate gradually.
@@ -191,7 +192,7 @@ Properties:
 - **Ack means durable.** Today ingestion acks on enqueue and persists later on a worker (see
   CLAUDE.md, "Ingestion RPC duration is not ingestion latency"); a crash loses acked data. Here an
   ack follows the durable log append (replicated in JetStream mode).
-- The legacy `ingestData*` RPCs become an adapter on the new service (phase 7), split per column
+- The legacy `ingestData*` RPCs become an adapter on the new service (phase 6), split per column
   into the same internal blocks, then deprecated.
 - **Owner-aware clients (optimization).** A client library may ask any node where its PVs live
   (`resolvePlacement(pvNames) → owner endpoints`) and send each PV straight to its owner, skipping
@@ -263,8 +264,9 @@ in the receive stage.
   these are exactly the unacked messages still in the stream). A zombie old owner fails its CAS on
   epoch. Redelivered rows are filtered by `committedRanges` and by the per-source `lastSeq`. No
   local disk state is needed to recover.
-- `pvStats` (#232) is updated by the writer in the same place it is today, **before** the commit
-  that makes the data visible, preserving "stats cover every stored bucket".
+- Per-PV statistics (`pvStats`, kept for #201-style statistics) are updated **before** the commit
+  that makes the data visible. The #232 span bound itself is not needed: it exists only to bound
+  Mongo bucket queries, and Parquet pruning uses file and row-group statistics instead.
 
 ### Internal node service
 
@@ -275,10 +277,10 @@ Nodes talk to each other through **one internal service on one port**, built on 
 |---|---|---|---|
 | `Forward` | `DoPut` stream | receiving node → owner | ingest batches for partitions the receiving node does not own (local mode) |
 | `ReadCached` | `DoGet` stream | query node → owner | cached rows for a partition and time range, with `ver`, only `seq ∉ committedRanges` |
-| `Subscribe` | `DoExchange` | subscriber's node → owner | live push of newly appended rows (local mode) |
+| `Subscribe` | `DoExchange` | streamer → owner | live push of newly durable rows, in both log modes (see "Streamer role and live subscriptions") |
 
-In JetStream mode `Forward` and `Subscribe` are not used, because the log routes data and serves
-subscriptions. `ReadCached` is the same in both modes.
+In JetStream mode `Forward` is not used, because the log routes data. `ReadCached` and
+`Subscribe` are the same in both modes.
 
 Rules:
 
@@ -358,21 +360,44 @@ calculations, PV metadata, configurations and configuration activations, and sam
   configuration activations (time selectors), and sample statuses (row filters) on the same
   read path as the data. Inside one service they are local lookups instead of calls across
   services, and one lease and partition model covers everything.
-- **Storage is a backend detail.** Clients never see Mongo buckets, Parquet files, or partitions.
-  The writer flushes through a `ColdStore` interface. The first implementation may write Mongo
-  buckets, managed entirely by the backend (bucket size and span chosen by the writer, `pvStats`
-  maintained, indexes created). Parquet is the target implementation. Switching changes only the
-  `ColdStore` behind the writer and the cold reader behind the planner.
+- **Storage is a backend detail.** Clients never see Parquet files or partitions. **Decided:
+  Parquet is the only cold store, from the first release.** Mongo `buckets` is not used as a cold
+  store, even temporarily: writing buckets first and moving them to Parquet later would pay the
+  database cost twice (insert, then read, rewrite, and delete) on the largest collection. The
+  writer still flushes through a `ColdStore` interface, so a future store (Iceberg) is a swap
+  behind it, but there is one implementation.
 - **Caches from the start.** The hot cache, late cache, commit bookkeeping, and query planner are
-  part of the first data-path release, whichever cold store sits behind them.
+  part of the first data-path release.
+- **`buckets` is retired as a write path.** The new service never writes it. It remains only as
+  the source of the one-time archive migration (see "Archive migration"), and is dropped once the
+  migration is verified. With it go the bucket-only mechanisms: the #232 `pvStats` span bound,
+  the #274 span classes, and the bucket index hint. No replacement index collection is added: the
+  manifest's per-PV index (with `fileIndex` as overflow) already answers "which files hold this PV
+  at this time", and `pvMetadata` is the catalog.
 - **Invariants to carry over.** The current code's hard-won rules are requirements for the new
   service, not legacy: the closed metrics attribute vocabulary (#212), reject vs error
-  classification (#235), blank-criterion guards (#243), the `pvStats` span bound if Mongo buckets
-  are the cold store (#232), time-sliced pages accepted whole (#274), outbound flow control (#274),
-  fail-closed schema migration (#254). CLAUDE.md is the checklist.
-- **Mongo-bucket idempotency.** If Mongo buckets are the cold store, the commit must still be
-  atomic. Bucket `_id` is derived from `(partition, first seq, pvName)` so a replayed flush produces
-  the same ids and the insert ignores duplicate keys. The `committedRanges` CAS follows the insert.
+  classification (#235), blank-criterion guards (#243), time-sliced pages accepted whole (#274),
+  outbound flow control (#274), fail-closed schema migration (#254). CLAUDE.md is the checklist.
+  The #232 span bound is deliberately not carried over (see above).
+
+### Archive migration
+
+The existing archive in `buckets` is converted once, by a bulk job, never by dual-writing:
+
+- **Read once, in index order.** The job walks `buckets` by `(pvName, firstTime)`, the existing
+  compound index, so it reads each bucket once with no extra index.
+- **Write through the normal path.** Each PV is placed with the normal placement rule, and its
+  history is written as sorted Parquet day files per partition, committed as `base` files with
+  ordinary manifest CAS commits. `ver` is taken from the bucket's original insert time, so a
+  later correction ingested live still wins.
+- **Throttled and resumable.** The job records a checkpoint per PV, runs at a configurable rate
+  so the live database is not saturated, and can stop and resume.
+- **No read fallback.** The planner never reads `buckets`. Until a PV's history is migrated, its
+  old range is simply not in the new service; the old query service stays the source of truth for
+  it during cutover, which the golden tests compare against.
+- **Verify, then drop.** Per PV per day, compare sample counts and value checksums between
+  `buckets` and the new files. Only after every PV verifies is `buckets` dropped. The delete is
+  one collection drop, not millions of document deletes.
 
 ## Ingest log: NATS optional
 
@@ -414,8 +439,9 @@ or per partition range for throughput.
 
 ### Mode `jetstream`
 
-As described in Part 2: replicated, durable across node loss, takeover by replay from the stream,
-cluster-wide subscriptions through JetStream consumers.
+As described in Part 2: replicated, durable across node loss, takeover by replay from the stream.
+JetStream is the ingest log only. Live subscriptions never use NATS, in either mode: they go
+through the streamer role.
 
 ### Mode `local`
 
@@ -440,8 +466,8 @@ append with group commit, a few ms of batching).
     and counted, never silent.
 - **Durability statement.** `local` with local disk is durable across process crashes, not across
   disk loss. The service logs the mode at startup, as for single-replica NATS.
-- **Subscriptions.** There is no shared log to consume, so a subscriber connects to the owners of
-  the requested PVs' partitions through the internal node service's `Subscribe` operation. The owner pushes rows as they
+- **Subscriptions.** Served by the streamer role through `Subscribe`, the same as in JetStream
+  mode. The owner pushes rows as they
   are appended. The query engine resolves owners the same way as for cached reads.
 
 ### Optional variant: write where received
@@ -460,7 +486,10 @@ balancer keeps clients on one node.
 |---|---|
 | Single node, lab, test stand | `local` |
 | Cluster with shared storage, no broker wanted | `local`, WAL on shared storage |
-| Cluster needing durability across node loss and cluster-wide subscriptions | `jetstream`, R3 |
+| Cluster needing durability across node loss | `jetstream`, R3 |
+
+Cluster-wide live subscriptions work in both modes through the streamer role, so they do not
+decide the mode.
 
 Switching mode is a restart with the logs drained: flush all caches so `uncommitted` is empty in
 the old log, then start with the new one. Placement, manifests, and files are unchanged.
@@ -513,9 +542,9 @@ and replay both test membership in the set.
 Cached rows are read from the partition owner over Arrow Flight (see "Query engine"). A query over
 only the recent window never touches Parquet.
 
-Subscriptions (`SourceMonitorManager`) should consume from JetStream directly (an ephemeral consumer
-on the relevant partition subjects), which gives every subscriber all PVs regardless of the
-receiving node; today a subscription sees only data its own instance ingested.
+Live subscriptions are served by the streamer role (see "Streamer role and live subscriptions"),
+which gives every subscriber all PVs regardless of the receiving node; today a subscription sees
+only data its own instance ingested.
 
 ### Late and historical data (initial idea)
 
@@ -594,11 +623,10 @@ without breaking the sort order of committed files or the exactly-once rule.
     its own in-flight limit. A large backfill then cannot delay live acks, and back-pressure on it
     pauses only the client streams sending historical blocks. This is invisible in the public
     API, which keeps it free to change.
-  - **Same commit, same result.** The same manifest CAS and `pvStats` update apply. A query
+  - **Same commit, same result.** The same manifest CAS and per-PV statistics update apply. A query
     returns identical rows whether the data arrived live or in a backfill.
-- **Per-PV statistics.** `pvStats.maxBucketSpanSeconds` (#232) still only grows, so a backfill
-  with long buckets widens the query bound for that PV, and nothing breaks. A late file updates
-  `pvStats` before its commit, like any flush.
+- **Per-PV statistics.** A late file updates the PV's statistics before its commit, like any flush.
+  There is no span bound to widen, because cold reads prune by file and row-group statistics.
 
 Open questions for this section are collected in Open decisions.
 
@@ -1117,17 +1145,89 @@ concatenation:
 - **Access control:** per-user row filters (e.g. hidden PV prefixes) are applied as a mandatory
   predicate on `pv_metadata` and `samples` by the binder, so no query text can bypass them.
 
+## Streamer role and live subscriptions
+
+Real-time data reaches clients through a dedicated **streamer** role, a relay between partition
+owners and subscribers. No broker is involved: NATS, when used at all, is only the durable ingest
+log. Clients connect only to streamers, never to owners.
+
+```
+owners (ingestion role)               streamers                        clients
+ p-0001 owner ──Subscribe(pvs)──▶  streamer-1 ──▶ dashboards, scripts, browsers (gRPC / WebSocket)
+ p-0004 owner ──Subscribe(pvs)──▶  streamer-2 ──▶ feedback apps, ML consumers
+```
+
+### When a notification fires
+
+The owner pushes a batch **after its append is durable** (WAL fsync or JetStream ack), the same
+moment the client's ingest ack is sent. A subscriber therefore never sees a sample that is later
+lost, and sees exactly what a query would. Two message kinds:
+
+- **Data:** the PV's Arrow batch, the same bytes as the wire format, with no conversion.
+- **Notify:** PV, time range, and `ver` only, for clients that want to know new data exists and
+  will query it.
+
+Event triggers (today's `SourceMonitorManager` and `ColumnTriggerUtility` conditions) are
+evaluated on the owner, so only matching events cross the network.
+
+### What the streamer does
+
+- **Client subscriptions** for PV names or patterns, with an optional `fromVer` to resume.
+- **One upstream subscription per PV, not per client.** The first client asking for a PV makes the
+  streamer resolve its owner (`resolvePlacement`) and add the PV to its stream to that owner; the
+  last client leaving removes it. An owner serves at most one stream per streamer, whatever the
+  client count.
+- **Fan-out.** Each batch is encoded once, and the same bytes go to every client of that PV.
+- **Cluster changes are hidden from clients:**
+  - *PV moved:* the old owner sends `MOVED(pv, newOwner)`. The streamer subscribes on the new
+    owner and keeps the old stream until it goes quiet, since stragglers may still land on the old
+    partition. Duplicates are dropped by `(pv, ts, ver)`.
+  - *Owner failover:* the streamer waits for the new lease and resubscribes with `fromVer` = the
+    last `ver` it relayed.
+  - *Gaps after a reconnect:* the owner replays from its hot cache starting after `fromVer`, then
+    switches to live. Within the hot window H (1 hour) a reconnect loses nothing.
+- **Client-facing policy:** access control per PV (the same per-user rules as SQL), per-client
+  rate limits and decimation (e.g. 10 Hz for a dashboard on a 1 kHz PV), and per-client bounded
+  buffers.
+- **Slow clients never slow ingest.** On buffer overflow the streamer sends `GAP(pv, from, to)`
+  and continues live; the client can fill the gap with a query. The owner's `Subscribe` streams
+  are bounded the same way, so a slow streamer also gets `GAP`, never back-pressure on ingest.
+- **Browser endpoints** (WebSocket, gRPC-Web) live on the streamer, so owners never expose them.
+
+### Scaling
+
+- **Owner fan-out is bounded** by the number of streamers holding a client for the PV, typically
+  a handful, independent of client count.
+- **Streamers are stateless apart from subscriptions and short buffers.** They scale
+  horizontally behind a load balancer, and any streamer serves any PV.
+- **Affinity for very popular PVs (opt-in).** Clients of one PV can be routed to a few streamers by
+  a hash of the PV name, reducing the copies its owner sends.
+- **Tiers.** A streamer can subscribe to another streamer (e.g. a control-room relay feeding local
+  dashboards). The protocol is the same, so relays nest.
+
+### Failure behavior
+
+- **Streamer crash:** clients reconnect to any streamer with their last `fromVer`; the new
+  streamer replays from the owner's hot cache.
+- **Owner crash:** streamers resubscribe to the new owner after its lease; clients see a short
+  delay, not an error.
+- **Owner unavailable beyond the hot window:** the streamer sends `GAP` for the missing range,
+  never silence that looks like "no data".
+
+The cost is one extra hop (sub-millisecond on a LAN) and one more role to size. In return, owners
+carry no client fan-out, clients stay simple, and real-time delivery needs no broker.
+
 ## Deployment
 
-One executable, `roles: [ingestion, query]` in config. Either or both per process. A site that
+One executable, `roles: [ingestion, query, streamer]` in config. Any subset per process. A site that
 wants dedicated ingest front ends can run `ingestion` with `ownPartitions: false`: the node runs
 the receive stage only and owns no partitions.
 
 | Shape | Processes | Typical use |
 |---|---|---|
-| Single node | 1 process, all roles, `ingestLog: local` | lab, test stand, small facility, dev |
+| Single node | 1 process, all roles, `ingestLog: local`; the streamer reads the local owner in-process | lab, test stand, small facility, dev |
 | Small cluster | 3 nodes, all roles each, NATS R3, or `local` with the WAL on shared storage | redundancy without role planning |
-| Split | ingestion ×N, query ×K, NATS R3 (optionally some receive-only ingestion nodes) | large facility; scale ingest and query independently |
+| Split | ingestion ×N, query ×K, streamer ×S on the client-facing network, NATS R3 (optionally some receive-only ingestion nodes) | large facility; scale ingest, query, and live fan-out independently |
 
 Rules that keep every shape the same system:
 
@@ -1165,7 +1265,7 @@ updates, which MongoDB makes atomic.
 ```js
 clusterNodes {            // one per running process
   _id: "node-7f3a",       // generated at start
-  host, roles: ["ingestion","query"], ownPartitions: true,
+  host, roles: ["ingestion","query","streamer"], ownPartitions: true,
   flightEndpoint: "10.0.1.7:8815",   // internal node service (Forward, ReadCached, Subscribe)
   grpcEndpoint: "10.0.1.7:50051",    // client-facing APIs
   startedAt, heartbeatAt, // renewed every 2 s
@@ -1352,7 +1452,7 @@ and `tMin/tMax` decide, not the interval).
 | Query planner | Resolves PV → every partition in `history`, prunes by the per-PV file index and the cache summary, and reads all survivors, including both owners' caches during the move. |
 | Merge | Deduplicates `(pv, ts)` across partitions by highest `ver`, which the receive stage stamps in both log modes. |
 | Compaction | Works per partition. A day can hold the PV's rows in two partitions, and the merge handles that. |
-| `pvStats` | Per PV, not per partition, so it is unaffected. |
+| Per-PV statistics | Per PV, not per partition, so they are unaffected. |
 
 **Ordering across a move.** The last-write-wins rule needs an order on writes to one `(pv, ts)`
 across partitions. The write version `ver` provides it in both log modes (see "Ingest log").
@@ -1410,6 +1510,8 @@ gradually under the limits above.
 | Kafka | Same model, works, but heavier to run (JVM, ZooKeeper/KRaft) for a facility install; NATS is a single Go binary, already common in controls environments. Keep the writer's log interface narrow so Kafka remains a swap-in. |
 | Broker required in every deployment | Forces a NATS cluster on single-node and small sites that do not need it. Replaced by the `IngestLog` interface with `jetstream` and `local` modes. |
 | Every instance writes, compaction merges later | Small files forever, cross-writer compaction conflicts on the manifest CAS, and duplicate resolution across files at read time. |
+| Core NATS for real-time fan-out | An extra system on the live path, no gap-free resume (a slow or reconnecting subscriber loses data), and different behavior between log modes. Replaced by the streamer role. |
+| Clients subscribe directly to owners | Every client must track owners, moves, and failover, and owners carry all client fan-out. Replaced by the streamer relay. |
 | Mongo change streams as the bus | Not designed for this rate; ties the bus to the storage being replaced. |
 
 ## Implementation phases
@@ -1422,20 +1524,20 @@ gradually under the limits above.
    query role, the internal node service, Arrow wire format end to end, and: JetStream with
    both lanes, placement on `pvMetadata`, on-demand partitions with leases and manifests, hot
    cache, late cache, commit bookkeeping, and the query planner with Flight reads of cached data.
-   The rebalancer comes later in this phase, after the base path works. Cold storage is the first `ColdStore` implementation (see
-   Open decisions).
+   The rebalancer comes later in this phase, after the base path works. Cold storage is Parquet
+   with compaction from the start.
 3. **SQL layer.** Engine spike first (see "Engine spike before committing"), then the engine embedded, `DpSampleScan` and the metadata tables, pushdown rules, `wide`
    and `during` table functions, guards, Flight SQL endpoint, and the gRPC-to-SQL translation for
    the existing query methods.
 4. **Unified domain.** Annotations, datasets, calculations, PV metadata, configurations and
    activations, and sample statuses, used by the query engine for column metadata, time
    selectors, and status filters.
-5. **Parquet cold store** with compaction, if phase 2 started on Mongo buckets.
-6. **Subscriptions on JetStream.** Cluster-wide subscriptions.
-7. **Legacy adapters and migration.** `ingestData*` adapter on the new service, golden tests
-   comparing old and new query results through the SQL translation, then migration of the existing
-   archive and retirement of the old services.
-8. **Iceberg cold table** (optional), once external engines need direct archive access.
+5. **Streamer role.** `Subscribe` on owners, streamer fan-out with resume, `MOVED`/`GAP`
+   handling, decimation, access control, and WebSocket/gRPC-Web endpoints.
+6. **Legacy adapters and migration.** `ingestData*` adapter on the new service, golden tests
+   comparing old and new query results through the SQL translation, the archive migration job
+   (see "Archive migration"), then dropping `buckets` and retiring the old services.
+7. **Iceberg cold table** (optional), once external engines need direct archive access.
 
 Running N instances is safe for both performance and the API from phase 2 on.
 
@@ -1457,6 +1559,11 @@ Running N instances is safe for both performance and the API from phase 2 on.
 - SQL tests: every gRPC query method returns identical results through the translation; `EXPLAIN`
   pins pruning (PV, time, key/value pushdown) for the documented query shapes; an unbounded
   `samples` scan is rejected; resource limits reject rather than error.
+- Migration test: convert a copy of a production `buckets` sample, verify per-PV per-day counts and
+  checksums, and measure the database load at the configured rate.
+- Streamer test: many clients on overlapping PVs; kill a streamer and an owner, move a PV
+  mid-stream; assert every client receives each sample once with no silent gap, measure fan-out
+  throughput and end-to-end latency from ingest ack to client.
 - Rebalance test: add and remove ingestion nodes under load; measure takeover time (lease expiry +
   replay).
 
@@ -1465,7 +1572,8 @@ Running N instances is safe for both performance and the API from phase 2 on.
 Decided in review:
 
 - Scope: a from-scratch unified service (ingestion, query, annotation domain), with caches in the
-  first release and storage hidden behind `ColdStore`.
+  first release; Parquet is the only cold store; `buckets` is retired as a write path and kept
+  only as the migration source.
 - API: a single `ingestSamples` endpoint for live and historical data, classified by the receive
   stage; owner-aware clients are an optional optimization.
 - Hot window H: 1 hour.
@@ -1476,6 +1584,9 @@ Decided in review:
   the file list, with per-PV row-group indexes; row groups mix PVs sorted by `(pvName, ts)`.
 - Deployment: one binary with two roles, ingestion and query; no separate gateway service.
 - Internal node service: one Flight service for `Forward`, `ReadCached`, `Subscribe`.
+- Live subscriptions: a dedicated streamer role relays from owners to clients; notifications fire
+  after the durable append; resume from the hot cache by `fromVer`; NATS is never on the live
+  path and is only the optional durable ingest log.
 - Sample layout: fixed schema with typed value columns (one set per row) and one `attrs`
   `list<struct<k, i64, f64, str, bool>>` column; typed and repeatable keys; promoted keys opt-in,
   ~8 max; per-file key lists and an `attrs.k` Bloom filter always on, other search accelerators
@@ -1491,7 +1602,7 @@ Decided in review:
 2. Flush window length.
 3. Implementation language for the new service (see `cpp-migration-analysis.md`,
    `rust-migration-analysis.md`, `cpp-columnar-storage-rationale.md`).
-4. First cold store: Mongo buckets managed by the backend, or Parquet directly.
+4. Archive migration rate limit and verification checksum (per PV per day).
 5. Custom Iceberg-shaped manifest vs real Iceberg for the cold table.
 6. SQL engine: DataFusion (recommended if Rust), DuckDB, or Calcite, following the
    implementation language and the engine spike.
@@ -1499,7 +1610,8 @@ Decided in review:
    timing-system pulse ids instead of timestamps where available.
 8. Late data: the compaction trigger (number of overlapping files per window, or ratio of rows
    read to rows returned), and the late cache's maximum age and memory cap.
-9. Migration of the existing Mongo archive and annotation collections into the new service.
+9. Migration of the annotation collections into the new service (the bucket archive approach is
+   decided, see "Archive migration").
 10. Rebalancer limits: dwell time, load threshold, move rate, history cap; whether re-home is needed
     in the first release.
 11. Local-mode defaults: whether `placement: receiver` is allowed in the first release, and the
@@ -1508,3 +1620,5 @@ Decided in review:
 13. Promoted-key list and cap, and which keys get value Bloom filters or an inverted index.
 14. SQL limits defaults (max time span, memory, rows, wall time, concurrency per user) and whether
     `samples` without a PV filter is allowed when the time span is small.
+15. Streamer defaults: per-client buffer size, decimation options, whether PV affinity routing is
+    in the first release, and the browser protocol (WebSocket vs gRPC-Web).
